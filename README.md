@@ -27,15 +27,18 @@ uv sync
 ### Development Server
 
 ```bash
-uv run python main.py
+uv run python -m src.app
 ```
 
 The application will start on `http://localhost:8080`
 
 ### Available Endpoints
 
-- `/` - Returns a simple "Hello from Web App!" message
-- `/health` - Returns application health status
+- `/` - AI Consulting homepage
+- `/about` - About the consultant
+- `/services` - AI integration services
+- `/contact` - Contact and booking information
+- `/health` - Health check endpoint
 
 ## Deployment
 

@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}AI Consulting - Modernize Your Business with AI Integration{% endblock %}
+
+{% block content %}
+
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <div class="hero-content">
+            <h1>Modernize Your Business with AI</h1>
+            <p class="hero-subtitle">Transform your operations, automate workflows, and unlock competitive advantages with strategic AI integration tailored for your business.</p>
+            <div class="hero-buttons">
+                <a href="{{ url_for('contact') }}" class="btn btn-primary">Book a 1-Hour Call</a>
+                <a href="{{ url_for('services') }}" class="btn btn-secondary">Explore Services</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Services Section -->
+<section class="services-section">
+    <div class="container">
+        <div class="section-header">
+            <h2>AI Integration Services</h2>
+            <p>Comprehensive solutions to help enterprise and small businesses harness the power of artificial intelligence.</p>
+        </div>
+        <div class="services-grid">
+            <div class="service-card">
+                <h3>AI Assessment & Strategy</h3>
+                <p>Comprehensive evaluation of your current systems and identification of AI opportunities that deliver maximum ROI.</p>
+                <ul>
+                    <li>Business process analysis</li>
+                    <li>AI readiness evaluation</li>
+                    <li>Custom implementation roadmap</li>
+                    <li>ROI projections & timeline</li>
+                </ul>
+            </div>
+            
+            <div class="service-card">
+                <h3>Workflow Automation</h3>
+                <p>Streamline operations and eliminate repetitive tasks with intelligent automation solutions.</p>
+                <ul>
+                    <li>Process automation design</li>
+                    <li>Integration with existing systems</li>
+                    <li>Custom workflow development</li>
+                    <li>Performance monitoring</li>
+                </ul>
+            </div>
+            
+            <div class="service-card">
+                <h3>GenAI Strategy</h3>
+                <p>Leverage generative AI to enhance creativity, content creation, and decision-making processes.</p>
+                <ul>
+                    <li>GenAI implementation planning</li>
+                    <li>Content generation systems</li>
+                    <li>AI-powered analytics</li>
+                    <li>Compliance & security protocols</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Why AI Section -->
+<section class="why-ai-section">
+    <div class="container">
+        <div class="section-header">
+            <h2>Why AI? Why Now?</h2>
+            <p>Artificial intelligence is no longer a future concept—it's a competitive necessity driving business transformation today.</p>
+        </div>
+        <div class="why-ai-grid">
+            <div class="benefit-card">
+                <div class="benefit-icon">🚀</div>
+                <h3>Increased Efficiency</h3>
+                <p>Automate routine tasks and processes, freeing your team to focus on high-value strategic work that drives growth.</p>
+            </div>
+            
+            <div class="benefit-card">
+                <div class="benefit-icon">💡</div>
+                <h3>Enhanced Decision Making</h3>
+                <p>Transform raw data into actionable insights with AI-powered analytics and predictive modeling capabilities.</p>
+            </div>
+            
+            <div class="benefit-card">
+                <div class="benefit-icon">💰</div>
+                <h3>Cost Reduction</h3>
+                <p>Reduce operational costs through intelligent automation while improving accuracy and reducing human error.</p>
+            </div>
+            
+            <div class="benefit-card">
+                <div class="benefit-icon">📈</div>
+                <h3>Scalable Growth</h3>
+                <p>Build systems that grow with your business, adapting to increased volume without proportional cost increases.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 1-Hour Strategy Call Section -->
+<section class="strategy-section">
+    <div class="container">
+        <div class="strategy-content">
+            <h2>1-Hour AI Strategy Call</h2>
+            <p>Get personalized insights and actionable recommendations for your business in just 60 minutes.</p>
+            
+            <div class="strategy-features">
+                <div class="feature-item">
+                    <h4>Fast Results</h4>
+                    <p>Immediate insights and next steps within one hour</p>
+                </div>
+                <div class="feature-item">
+                    <h4>Tailored Approach</h4>
+                    <p>Solutions customized to your specific business needs</p>
+                </div>
+                <div class="feature-item">
+                    <h4>ROI Focused</h4>
+                    <p>Prioritize opportunities with highest return potential</p>
+                </div>
+                <div class="feature-item">
+                    <h4>No Commitment</h4>
+                    <p>Valuable insights with no obligation to proceed</p>
+                </div>
+            </div>
+            
+            <p>In our call, we'll analyze your current operations, identify AI opportunities, and create a preliminary roadmap for implementation.</p>
+            <a href="{{ url_for('contact') }}" class="btn btn-primary">Schedule Your Call Today</a>
+        </div>
+    </div>
+</section>
+
+<!-- Testimonials Section -->
+<section class="testimonials-section">
+    <div class="container">
+        <div class="section-header">
+            <h2>Client Success Stories</h2>
+            <p>See how businesses like yours have transformed their operations with strategic AI integration.</p>
+        </div>
+        <div class="testimonials-grid">
+            <div class="testimonial-card">
+                <div class="testimonial-text">
+                    The AI assessment revealed opportunities we never considered. Within 3 months, we automated 40% of our customer support processes and reduced response times by 75%.
+                </div>
+                <div class="testimonial-author">Sarah Chen</div>
+                <div class="testimonial-role">CTO, TechStart Solutions</div>
+            </div>
+            
+            <div class="testimonial-card">
+                <div class="testimonial-text">
+                    Our 1-hour strategy call provided a clear roadmap for AI integration. The ROI projections were spot-on, and we're seeing 200% returns within the first year.
+                </div>
+                <div class="testimonial-author">Marcus Thompson</div>
+                <div class="testimonial-role">Operations Director, Global Manufacturing Inc</div>
+            </div>
+            
+            <div class="testimonial-card">
+                <div class="testimonial-text">
+                    The workflow automation solution transformed our entire sales process. We're processing 3x more leads with the same team size.
+                </div>
+                <div class="testimonial-author">Jennifer Walsh</div>
+                <div class="testimonial-role">VP Sales, Enterprise Solutions</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Trust Signals Section -->
+<section class="trust-section">
+    <div class="container">
+        <p style="margin-bottom: 2rem; color: var(--brushed-silver);">Trusted by leading companies across industries</p>
+        <div class="client-logos">
+            <div class="client-logo">TechCorp</div>
+            <div class="client-logo">InnovateNow</div>
+            <div class="client-logo">DataSystems</div>
+            <div class="client-logo">AutoFlow</div>
+            <div class="client-logo">SmartBiz</div>
+        </div>
+    </div>
+</section>
+
+<!-- About the Consultant Section -->
+<section class="about-section">
+    <div class="container">
+        <div class="about-content">
+            <div class="about-image">
+                <div class="consultant-photo">
+                    AI Expert
+                </div>
+            </div>
+            <div class="about-text">
+                <h2>Meet Your AI Consultant</h2>
+                <p>With over a decade of experience in enterprise technology and AI implementation, I specialize in translating complex AI capabilities into practical business solutions.</p>
+                
+                <p>I've helped companies from startups to Fortune 500 enterprises successfully integrate AI into their operations, resulting in millions in cost savings and efficiency gains.</p>
+                
+                <p>My approach is practical, results-driven, and focused on sustainable implementation that grows with your business. Whether you're taking your first steps with AI or looking to optimize existing systems, I'm here to guide you through every phase of your AI transformation journey.</p>
+                
+                <a href="{{ url_for('about') }}" class="btn btn-secondary">Learn More About My Background</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How It Works Section -->
+<section class="services-section">
+    <div class="container">
+        <div class="section-header">
+            <h2>How It Works</h2>
+            <p>A proven process for successful AI integration tailored to your business needs.</p>
+        </div>
+        <div class="services-grid">
+            <div class="service-card">
+                <h3>1. Discovery & Assessment</h3>
+                <p>We start with a comprehensive analysis of your current systems, processes, and AI readiness.</p>
+                <ul>
+                    <li>Business process mapping</li>
+                    <li>Technology stack evaluation</li>
+                    <li>Opportunity identification</li>
+                    <li>Feasibility analysis</li>
+                </ul>
+            </div>
+            
+            <div class="service-card">
+                <h3>2. Strategy & Planning</h3>
+                <p>Develop a customized roadmap with clear milestones, timelines, and expected outcomes.</p>
+                <ul>
+                    <li>Implementation roadmap</li>
+                    <li>Resource requirements</li>
+                    <li>Risk assessment</li>
+                    <li>Success metrics definition</li>
+                </ul>
+            </div>
+            
+            <div class="service-card">
+                <h3>3. Implementation & Support</h3>
+                <p>Guide you through implementation with ongoing support to ensure successful adoption and optimization.</p>
+                <ul>
+                    <li>Phased implementation</li>
+                    <li>Team training & support</li>
+                    <li>Performance monitoring</li>
+                    <li>Continuous optimization</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

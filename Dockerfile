@@ -18,5 +18,8 @@ COPY . .
 # Expose port
 EXPOSE 8080
 
+# Set PYTHONPATH to include the project root
+ENV PYTHONPATH=/app
+
 # Run the application with Gunicorn
 CMD ["uv", "run", "gunicorn", "--bind", "0.0.0.0:8080", "wsgi:app"]
