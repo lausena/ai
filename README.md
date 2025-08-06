@@ -51,9 +51,28 @@ uv sync
 uv run gunicorn --bind 0.0.0.0:8080 wsgi:app
 ```
 
+### Docker Deployment
+
+To deploy using Docker on Ubuntu:
+
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd ai
+
+# Build the Docker image
+docker build -t ai-app .
+
+# Run the container
+docker run -d -p 8080:8080 --name ai-app ai-app
+
+# Or use docker-compose (create docker-compose.yml first)
+docker-compose up -d
+```
+
 ### Web Server Configuration
 
-Configure your web server (nginx, Apache, etc.) to proxy requests to the Gunicorn server running on port 8080.
+Configure your web server (nginx, Apache, etc.) to proxy requests to the application running on port 8080.
 
 Example nginx configuration:
 ```nginx
