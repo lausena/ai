@@ -1,0 +1,31 @@
+# Copy this file to terraform.tfvars and fill in your values
+
+# DigitalOcean API token (get from: https://cloud.digitalocean.com/account/api/tokens)
+do_token = "your-digitalocean-api-token-here"
+
+# Path to your SSH public key
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# DigitalOcean region (nyc1, nyc3, ams3, sfo3, sgp1, etc.)
+region = "nyc3"
+
+# Droplet size (valid sizes: s-1vcpu-1gb, s-1vcpu-2gb, s-2vcpu-2gb, s-2vcpu-4gb, s-4vcpu-8gb, etc.)
+droplet_size = "s-1vcpu-1gb"
+
+# Environment (dev, staging, prod)
+environment = "prod"
+
+# Domain name (optional - leave empty if you don't have one)
+domain_name = "evalpoint.ai"
+
+# Enable automated backups (recommended for production)
+enable_backups = true
+
+# IP addresses allowed to SSH (use your IP for security)
+ssh_allowed_ips = ["0.0.0.0/0"]
+
+# IP addresses allowed to access app directly on port 8080
+app_allowed_ips = ["0.0.0.0/0"]
+
+# Manage DNS records (set to false if domain/records already exist)
+manage_dns_records = false

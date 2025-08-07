@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}About - Gabriel Sena | EvalPoint{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+    <div class="section-container">
+        <h1 class="page-title">About Gabriel Sena</h1>
+        <p class="page-subtitle">AI systems strategist focused on long-term readiness in a fast-moving field.</p>
+    </div>
+</section>
+
+<section class="about-content">
+    <div class="section-container">
+        <div class="about-grid">
+            <div class="about-text">
+                <h2 class="section-title">Why I Built EvalPoint</h2>
+                <p class="about-paragraph">
+                    I've seen too many teams chase models or tools without a plan — wasting time, budget, and opportunity. 
+                    I believe the key to successful AI adoption lies in strong design choices, modular thinking, and a clear 
+                    understanding of your organization's goals.
+                </p>
+                
+                <h3 class="subsection-title">My Experience</h3>
+                <ul class="experience-list">
+                    <li>Deep expertise in AI Tooling (Claude Code, Gemini, etc.) and MCP (Model Context Protocol)</li>
+                    <li>15+ years in software and data platforms</li>
+                    <li>Advisor to startups and enterprise teams on AI integration strategy</li>
+                    <li>Focused on practical implementation, not hype</li>
+                </ul>
+                
+                <div class="philosophy-box">
+                    <h3 class="philosophy-title">My Philosophy</h3>
+                    <p class="philosophy-text">
+                        I work best with teams who are curious, ambitious, and ready to invest in doing AI <em>right</em>. 
+                        It's about building systems that last, not just following trends.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="about-sidebar">
+                <div class="expertise-card">
+                    <h3 class="card-title">Core Expertise</h3>
+                    <div class="expertise-tags">
+                        <span class="tag">AI Integration Strategy</span>
+                        <span class="tag">Claude Code</span>
+                        <span class="tag">Model Context Protocol</span>
+                        <span class="tag">System Architecture</span>
+                        <span class="tag">Team Enablement</span>
+                        <span class="tag">Platform Design</span>
+                    </div>
+                </div>
+                
+                <div class="approach-card">
+                    <h3 class="card-title">My Approach</h3>
+                    <ul class="approach-list">
+                        <li>🎯 Strategy over tactics</li>
+                        <li>🏗️ Modular implementations</li>
+                        <li>📚 Knowledge transfer</li>
+                        <li>🚀 Practical results</li>
+                        <li>🔮 Future-ready thinking</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="section-container">
+        <h2 class="cta-title">Ready to Work Together?</h2>
+        <p class="cta-description">Let's discuss how I can help your team build AI systems that truly last.</p>
+        <a href="{{ url_for('strategy_call') }}" class="cta-button">Schedule a Strategy Call</a>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Services - AI Integration & Strategy | EvalPoint{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+    <div class="section-container">
+        <h1 class="page-title">Services</h1>
+        <p class="page-subtitle">Comprehensive AI integration and strategy services designed to build systems that last.</p>
+    </div>
+</section>
+
+<section class="services-grid">
+    <div class="section-container">
+        <div class="services-container">
+            <div class="service-card featured">
+                <div class="service-icon">🎯</div>
+                <h2 class="service-title">AI Integration Strategy</h2>
+                <p class="service-description">
+                    Navigate the complex AI landscape with strategic planning that focuses on lasting value, not temporary trends.
+                </p>
+                <ul class="service-features">
+                    <li>Tool selection and architecture planning</li>
+                    <li>Modular implementations with Claude Code and MCP</li>
+                    <li>Advisory for AI-enabled platforms</li>
+                    <li>Technology roadmap development</li>
+                </ul>
+                <div class="service-outcome">
+                    <strong>Outcome:</strong> Clear, actionable plan for AI adoption that scales with your business.
+                </div>
+            </div>
+
+            <div class="service-card">
+                <div class="service-icon">🔍</div>
+                <h2 class="service-title">System Design Reviews</h2>
+                <p class="service-description">
+                    Get expert evaluation of your current AI implementations and identify opportunities for improvement.
+                </p>
+                <ul class="service-features">
+                    <li>Evaluate current LLM or data workflows</li>
+                    <li>Identify bottlenecks and inefficiencies</li>
+                    <li>Suggest durable improvements based on AI best practices</li>
+                    <li>Performance and scalability assessment</li>
+                </ul>
+                <div class="service-outcome">
+                    <strong>Outcome:</strong> Detailed report with prioritized recommendations for optimization.
+                </div>
+            </div>
+
+            <div class="service-card">
+                <div class="service-icon">🚀</div>
+                <h2 class="service-title">Internal Enablement</h2>
+                <p class="service-description">
+                    Empower your team with the knowledge and frameworks needed to implement AI solutions effectively.
+                </p>
+                <ul class="service-features">
+                    <li>Help teams build mental models for AI tooling</li>
+                    <li>Create custom docs/playbooks to guide internal adoption</li>
+                    <li>Training workshops on Claude Code and MCP</li>
+                    <li>Establish AI governance and best practices</li>
+                </ul>
+                <div class="service-outcome">
+                    <strong>Outcome:</strong> Self-sufficient team with clear processes and documentation.
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="methodology-section">
+    <div class="section-container">
+        <h2 class="section-title">My Methodology</h2>
+        <div class="methodology-grid">
+            <div class="methodology-step">
+                <div class="step-number">01</div>
+                <h3 class="step-title">Assess</h3>
+                <p class="step-description">Understand your current state, goals, and constraints through deep discovery sessions.</p>
+            </div>
+            <div class="methodology-step">
+                <div class="step-number">02</div>
+                <h3 class="step-title">Design</h3>
+                <p class="step-description">Create modular, adaptable architectures that align with your business objectives.</p>
+            </div>
+            <div class="methodology-step">
+                <div class="step-number">03</div>
+                <h3 class="step-title">Implement</h3>
+                <p class="step-description">Guide practical implementation with hands-on support and knowledge transfer.</p>
+            </div>
+            <div class="methodology-step">
+                <div class="step-number">04</div>
+                <h3 class="step-title">Enable</h3>
+                <p class="step-description">Ensure your team can maintain and evolve the solution independently.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="section-container">
+        <h2 class="cta-title">Ready to Get Started?</h2>
+        <p class="cta-description">Book a strategy call to discuss your AI integration needs and explore how we can work together.</p>
+        <a href="{{ url_for('strategy_call') }}" class="cta-button">Schedule Your Strategy Call</a>
+    </div>
+</section>
+{% endblock %}

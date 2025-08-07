@@ -40,1012 +40,2904 @@ The content is organized as follows:
 </file_summary>
 
 <directory_structure>
-src/
-  mcp_server_git/
-    __init__.py
-    __main__.py
-    server.py
-tests/
-  test_server.py
+assets/
+  css/
+    app.css
+  static/
+    502.html
+    browserconfig.xml
+    maintenance.html
+    robots.txt
+    safari-pinned-tab.svg
+    site.webmanifest
+  .yarnrc
+  esbuild.config.mjs
+  package.json
+  tailwind.config.js
+bin/
+  docker-entrypoint-web
+  rename-project
+  uv-install
+config/
+  gunicorn.py
+  settings.py
+db/
+  env.py
+  script.py.mako
+  seeds.py
+hello/
+  page/
+    templates/
+      page/
+        home.html
+    views.py
+  templates/
+    layouts/
+      index.html
+  up/
+    views.py
+  app.py
+  extensions.py
+  initializers.py
+lib/
+  test.py
+test/
+  hello/
+    page/
+      test_views.py
+    up/
+      test_views.py
+  conftest.py
+.dockerignore
+.editorconfig
+.env.example
 .gitignore
-.python-version
+.hadolint.yaml
+alembic.ini
+CHANGELOG.md
+compose.yaml
 Dockerfile
-LICENSE
 pyproject.toml
 README.md
+run
 </directory_structure>
 
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/mcp_server_git/__init__.py">
-import click
-from pathlib import Path
-import logging
-import sys
-from .server import serve
-
-@click.command()
-@click.option("--repository", "-r", type=Path, help="Git repository path")
-@click.option("-v", "--verbose", count=True)
-def main(repository: Path | None, verbose: bool) -> None:
-    """MCP Git Server - Git functionality for MCP"""
-    import asyncio
-
-    logging_level = logging.WARN
-    if verbose == 1:
-        logging_level = logging.INFO
-    elif verbose >= 2:
-        logging_level = logging.DEBUG
-
-    logging.basicConfig(level=logging_level, stream=sys.stderr)
-    asyncio.run(serve(repository))
-
-if __name__ == "__main__":
-    main()
+<file path="assets/static/502.html">
+<!DOCTYPE html>
+<head>
+  <title>Please Reload Your Browser</title>
+  <style>
+    body {
+      background-color: #fff;
+      width: 960px;
+      margin: 0 auto;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    h1 {
+      font-size: 42px;
+      color: #000;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #000;
+    }
+    h2 {
+      margin-bottom: 42px;
+    }
+    p {
+      color: #444;
+      font-size: 22px;
+    }
+  </style>
+</head>
+<body>
+  <h1>A New Version of This Site Was Just Released</h1>
+  <h2>It takes a few seconds to come back up on its own. Nice timing!</h2>
+  <p>It should be fixed by the time you read this message. Try reloading your browser.</p>
+  <p><i>P.S., don't worry, your data is safely backed up!</i></p>
+  <hr>
+  <p>Seeing this page for a while? Chances are automated tools have notified me of the issue and I'm working on it but if it doesn't self resolve soon check Twitter for updates at: <a href="https://twitter.com/nickjanetakis">@nickjanetakis</a></p>
+</body>
+</html>
 </file>
 
-<file path="src/mcp_server_git/__main__.py">
-# __main__.py
-
-from mcp_server_git import main
-
-main()
+<file path="assets/static/browserconfig.xml">
+<?xml version="1.0" encoding="utf-8"?>
+<browserconfig>
+    <msapplication>
+        <tile>
+            <square150x150logo src="/mstile-150x150.png"/>
+            <TileColor>#da532c</TileColor>
+        </tile>
+    </msapplication>
+</browserconfig>
 </file>
 
-<file path="src/mcp_server_git/server.py">
-import logging
-from pathlib import Path
-from typing import Sequence, Optional
-from mcp.server import Server
-from mcp.server.session import ServerSession
-from mcp.server.stdio import stdio_server
-from mcp.types import (
-    ClientCapabilities,
-    TextContent,
-    Tool,
-    ListRootsResult,
-    RootsCapability,
-)
-from enum import Enum
-import git
-from pydantic import BaseModel, Field
-
-# Default number of context lines to show in diff output
-DEFAULT_CONTEXT_LINES = 3
-
-class GitStatus(BaseModel):
-    repo_path: str
-
-class GitDiffUnstaged(BaseModel):
-    repo_path: str
-    context_lines: int = DEFAULT_CONTEXT_LINES
-
-class GitDiffStaged(BaseModel):
-    repo_path: str
-    context_lines: int = DEFAULT_CONTEXT_LINES
-
-class GitDiff(BaseModel):
-    repo_path: str
-    target: str
-    context_lines: int = DEFAULT_CONTEXT_LINES
-
-class GitCommit(BaseModel):
-    repo_path: str
-    message: str
-
-class GitAdd(BaseModel):
-    repo_path: str
-    files: list[str]
-
-class GitReset(BaseModel):
-    repo_path: str
-
-class GitLog(BaseModel):
-    repo_path: str
-    max_count: int = 10
-
-class GitCreateBranch(BaseModel):
-    repo_path: str
-    branch_name: str
-    base_branch: str | None = None
-
-class GitCheckout(BaseModel):
-    repo_path: str
-    branch_name: str
-
-class GitShow(BaseModel):
-    repo_path: str
-    revision: str
-
-class GitInit(BaseModel):
-    repo_path: str
-
-class GitBranch(BaseModel):
-    repo_path: str = Field(
-        ...,
-        description="The path to the Git repository.",
-    )
-    branch_type: str = Field(
-        ...,
-        description="Whether to list local branches ('local'), remote branches ('remote') or all branches('all').",
-    )
-    contains: Optional[str] = Field(
-        None,
-        description="The commit sha that branch should contain. Do not pass anything to this param if no commit sha is specified",
-    )
-    not_contains: Optional[str] = Field(
-        None,
-        description="The commit sha that branch should NOT contain. Do not pass anything to this param if no commit sha is specified",
-    )
-
-class GitTools(str, Enum):
-    STATUS = "git_status"
-    DIFF_UNSTAGED = "git_diff_unstaged"
-    DIFF_STAGED = "git_diff_staged"
-    DIFF = "git_diff"
-    COMMIT = "git_commit"
-    ADD = "git_add"
-    RESET = "git_reset"
-    LOG = "git_log"
-    CREATE_BRANCH = "git_create_branch"
-    CHECKOUT = "git_checkout"
-    SHOW = "git_show"
-    INIT = "git_init"
-    BRANCH = "git_branch"
-
-def git_status(repo: git.Repo) -> str:
-    return repo.git.status()
-
-def git_diff_unstaged(repo: git.Repo, context_lines: int = DEFAULT_CONTEXT_LINES) -> str:
-    return repo.git.diff(f"--unified={context_lines}")
-
-def git_diff_staged(repo: git.Repo, context_lines: int = DEFAULT_CONTEXT_LINES) -> str:
-    return repo.git.diff(f"--unified={context_lines}", "--cached")
-
-def git_diff(repo: git.Repo, target: str, context_lines: int = DEFAULT_CONTEXT_LINES) -> str:
-    return repo.git.diff(f"--unified={context_lines}", target)
-
-def git_commit(repo: git.Repo, message: str) -> str:
-    commit = repo.index.commit(message)
-    return f"Changes committed successfully with hash {commit.hexsha}"
-
-def git_add(repo: git.Repo, files: list[str]) -> str:
-    repo.index.add(files)
-    return "Files staged successfully"
-
-def git_reset(repo: git.Repo) -> str:
-    repo.index.reset()
-    return "All staged changes reset"
-
-def git_log(repo: git.Repo, max_count: int = 10) -> list[str]:
-    commits = list(repo.iter_commits(max_count=max_count))
-    log = []
-    for commit in commits:
-        log.append(
-            f"Commit: {commit.hexsha!r}\n"
-            f"Author: {commit.author!r}\n"
-            f"Date: {commit.authored_datetime}\n"
-            f"Message: {commit.message!r}\n"
-        )
-    return log
-
-def git_create_branch(repo: git.Repo, branch_name: str, base_branch: str | None = None) -> str:
-    if base_branch:
-        base = repo.references[base_branch]
-    else:
-        base = repo.active_branch
-
-    repo.create_head(branch_name, base)
-    return f"Created branch '{branch_name}' from '{base.name}'"
-
-def git_checkout(repo: git.Repo, branch_name: str) -> str:
-    repo.git.checkout(branch_name)
-    return f"Switched to branch '{branch_name}'"
-
-def git_init(repo_path: str) -> str:
-    try:
-        repo = git.Repo.init(path=repo_path, mkdir=True)
-        return f"Initialized empty Git repository in {repo.git_dir}"
-    except Exception as e:
-        return f"Error initializing repository: {str(e)}"
-
-def git_show(repo: git.Repo, revision: str) -> str:
-    commit = repo.commit(revision)
-    output = [
-        f"Commit: {commit.hexsha!r}\n"
-        f"Author: {commit.author!r}\n"
-        f"Date: {commit.authored_datetime!r}\n"
-        f"Message: {commit.message!r}\n"
-    ]
-    if commit.parents:
-        parent = commit.parents[0]
-        diff = parent.diff(commit, create_patch=True)
-    else:
-        diff = commit.diff(git.NULL_TREE, create_patch=True)
-    for d in diff:
-        output.append(f"\n--- {d.a_path}\n+++ {d.b_path}\n")
-        output.append(d.diff.decode('utf-8'))
-    return "".join(output)
-
-def git_branch(repo: git.Repo, branch_type: str, contains: str | None = None, not_contains: str | None = None) -> str:
-    match contains:
-        case None:
-            contains_sha = (None,)
-        case _:
-            contains_sha = ("--contains", contains)
-
-    match not_contains:
-        case None:
-            not_contains_sha = (None,)
-        case _:
-            not_contains_sha = ("--no-contains", not_contains)
-
-    match branch_type:
-        case 'local':
-            b_type = None
-        case 'remote':
-            b_type = "-r"
-        case 'all':
-            b_type = "-a"
-        case _:
-            return f"Invalid branch type: {branch_type}"
-
-    # None value will be auto deleted by GitPython
-    branch_info = repo.git.branch(b_type, *contains_sha, *not_contains_sha)
-
-    return branch_info
-
-async def serve(repository: Path | None) -> None:
-    logger = logging.getLogger(__name__)
-
-    if repository is not None:
-        try:
-            git.Repo(repository)
-            logger.info(f"Using repository at {repository}")
-        except git.InvalidGitRepositoryError:
-            logger.error(f"{repository} is not a valid Git repository")
-            return
-
-    server = Server("mcp-git")
-
-    @server.list_tools()
-    async def list_tools() -> list[Tool]:
-        return [
-            Tool(
-                name=GitTools.STATUS,
-                description="Shows the working tree status",
-                inputSchema=GitStatus.model_json_schema(),
-            ),
-            Tool(
-                name=GitTools.DIFF_UNSTAGED,
-                description="Shows changes in the working directory that are not yet staged",
-                inputSchema=GitDiffUnstaged.model_json_schema(),
-            ),
-            Tool(
-                name=GitTools.DIFF_STAGED,
-                description="Shows changes that are staged for commit",
-                inputSchema=GitDiffStaged.model_json_schema(),
-            ),
-            Tool(
-                name=GitTools.DIFF,
-                description="Shows differences between branches or commits",
-                inputSchema=GitDiff.model_json_schema(),
-            ),
-            Tool(
-                name=GitTools.COMMIT,
-                description="Records changes to the repository",
-                inputSchema=GitCommit.model_json_schema(),
-            ),
-            Tool(
-                name=GitTools.ADD,
-                description="Adds file contents to the staging area",
-                inputSchema=GitAdd.model_json_schema(),
-            ),
-            Tool(
-                name=GitTools.RESET,
-                description="Unstages all staged changes",
-                inputSchema=GitReset.model_json_schema(),
-            ),
-            Tool(
-                name=GitTools.LOG,
-                description="Shows the commit logs",
-                inputSchema=GitLog.model_json_schema(),
-            ),
-            Tool(
-                name=GitTools.CREATE_BRANCH,
-                description="Creates a new branch from an optional base branch",
-                inputSchema=GitCreateBranch.model_json_schema(),
-            ),
-            Tool(
-                name=GitTools.CHECKOUT,
-                description="Switches branches",
-                inputSchema=GitCheckout.model_json_schema(),
-            ),
-            Tool(
-                name=GitTools.SHOW,
-                description="Shows the contents of a commit",
-                inputSchema=GitShow.model_json_schema(),
-            ),
-            Tool(
-                name=GitTools.INIT,
-                description="Initialize a new Git repository",
-                inputSchema=GitInit.model_json_schema(),
-            ),
-            Tool(
-                name=GitTools.BRANCH,
-                description="List Git branches",
-                inputSchema=GitBranch.model_json_schema(),
-            )
-        ]
-
-    async def list_repos() -> Sequence[str]:
-        async def by_roots() -> Sequence[str]:
-            if not isinstance(server.request_context.session, ServerSession):
-                raise TypeError("server.request_context.session must be a ServerSession")
-
-            if not server.request_context.session.check_client_capability(
-                ClientCapabilities(roots=RootsCapability())
-            ):
-                return []
-
-            roots_result: ListRootsResult = await server.request_context.session.list_roots()
-            logger.debug(f"Roots result: {roots_result}")
-            repo_paths = []
-            for root in roots_result.roots:
-                path = root.uri.path
-                try:
-                    git.Repo(path)
-                    repo_paths.append(str(path))
-                except git.InvalidGitRepositoryError:
-                    pass
-            return repo_paths
-
-        def by_commandline() -> Sequence[str]:
-            return [str(repository)] if repository is not None else []
-
-        cmd_repos = by_commandline()
-        root_repos = await by_roots()
-        return [*root_repos, *cmd_repos]
-
-    @server.call_tool()
-    async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-        repo_path = Path(arguments["repo_path"])
-        
-        # Handle git init separately since it doesn't require an existing repo
-        if name == GitTools.INIT:
-            result = git_init(str(repo_path))
-            return [TextContent(
-                type="text",
-                text=result
-            )]
-            
-        # For all other commands, we need an existing repo
-        repo = git.Repo(repo_path)
-
-        match name:
-            case GitTools.STATUS:
-                status = git_status(repo)
-                return [TextContent(
-                    type="text",
-                    text=f"Repository status:\n{status}"
-                )]
-
-            case GitTools.DIFF_UNSTAGED:
-                diff = git_diff_unstaged(repo, arguments.get("context_lines", DEFAULT_CONTEXT_LINES))
-                return [TextContent(
-                    type="text",
-                    text=f"Unstaged changes:\n{diff}"
-                )]
-
-            case GitTools.DIFF_STAGED:
-                diff = git_diff_staged(repo, arguments.get("context_lines", DEFAULT_CONTEXT_LINES))
-                return [TextContent(
-                    type="text",
-                    text=f"Staged changes:\n{diff}"
-                )]
-
-            case GitTools.DIFF:
-                diff = git_diff(repo, arguments["target"], arguments.get("context_lines", DEFAULT_CONTEXT_LINES))
-                return [TextContent(
-                    type="text",
-                    text=f"Diff with {arguments['target']}:\n{diff}"
-                )]
-
-            case GitTools.COMMIT:
-                result = git_commit(repo, arguments["message"])
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
-
-            case GitTools.ADD:
-                result = git_add(repo, arguments["files"])
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
-
-            case GitTools.RESET:
-                result = git_reset(repo)
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
-
-            case GitTools.LOG:
-                log = git_log(repo, arguments.get("max_count", 10))
-                return [TextContent(
-                    type="text",
-                    text="Commit history:\n" + "\n".join(log)
-                )]
-
-            case GitTools.CREATE_BRANCH:
-                result = git_create_branch(
-                    repo,
-                    arguments["branch_name"],
-                    arguments.get("base_branch")
-                )
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
-
-            case GitTools.CHECKOUT:
-                result = git_checkout(repo, arguments["branch_name"])
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
-
-            case GitTools.SHOW:
-                result = git_show(repo, arguments["revision"])
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
-
-            case GitTools.BRANCH:
-                result = git_branch(
-                    repo,
-                    arguments.get("branch_type", 'local'),
-                    arguments.get("contains", None),
-                    arguments.get("not_contains", None),
-                )
-                return [TextContent(
-                    type="text",
-                    text=result
-                )]
-
-            case _:
-                raise ValueError(f"Unknown tool: {name}")
-
-    options = server.create_initialization_options()
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, options, raise_exceptions=True)
+<file path="assets/static/maintenance.html">
+<!DOCTYPE html>
+<head>
+  <title>Down for Planned Maintenance</title>
+  <style>
+    body {
+      background-color: #fff;
+      width: 960px;
+      margin: 0 auto;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    h1 {
+      font-size: 42px;
+      color: #000;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #000;
+    }
+    h2 {
+      margin-bottom: 42px;
+    }
+    p {
+      color: #444;
+      font-size: 22px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Down for Temporary Planned Maintenance</h1>
+  <h2>Reason: The server is being upgraded to make things faster for you.</h2>
+  <p>If all goes well everything will be up and running by 2pm EST, please check back then.</p>
+  <p><i>P.S., don't worry, your data is safely backed up!</i></p>
+  <hr>
+  <p>Status updates may be posted on Twitter at: <a href="https://twitter.com/nickjanetakis">@nickjanetakis</a></p>
+</body>
+</html>
 </file>
 
-<file path="tests/test_server.py">
+<file path="assets/static/robots.txt">
+# TODO: This will block all robots from crawling your site. You probably don't
+# want this set in production, but could be useful for a test / staging server.
+User-agent: *
+Disallow: /
+</file>
+
+<file path="assets/static/safari-pinned-tab.svg">
+<svg version="1" xmlns="http://www.w3.org/2000/svg" width="682.667" height="682.667" viewBox="0 0 512.000000 512.000000"><path d="M228.6 3.1c-4.8 5.6-6.1 12.6-6 30.9.1 14.4.4 17.7 2.7 26.4 3.1 11.6 7.2 19.4 11.6 22 2.9 1.7 3.3 1.7 5.6.2 6.4-4.2 9-15.7 8.2-36.9-.8-20.7-5.1-35.9-12.2-43-3.6-3.5-6.7-3.5-9.9.4zM431 44.9c-17.7 5.4-53.4 49-58.1 71-.9 4.4-.8 5.6.5 7.6 2.2 3.4 5.5 3.2 12.7-.6 18.9-10.1 48.5-48.3 53-68.5 1-4.6 1-5.6-.5-7.8-1.7-2.7-3.2-3-7.6-1.7zM63.7 72.5c-4.3 4.2.7 13.1 15.7 28.1 16.7 16.6 34.8 29.2 50.8 35.4 22.6 8.7 23.9-2.6 3-24.3C109 86.8 70.9 65.3 63.7 72.5zM241 115.6c-23.8 3.1-44.7 10.8-64 23.7-10.6 7.1-27.5 24.3-34.5 35.1-24.9 38.3-26.8 84.9-5.3 125.6 7.1 13.3 14 23.1 35.1 49.7 20.8 26.1 26.9 34.9 33.2 47.8 8.8 18.1 11.8 32 11.8 54-.1 17.4.5 19.6 3.7 14.2l2.2-3.7 3.8 2c8.1 4.2 28.9 8 43.2 8 15.7 0 31.2-4.1 33.7-8.9 1.4-2.6.3-5-3.9-8.3l-2.9-2.3 2.5-5.3c1.4-2.8 6.8-16.6 12-30.5 14.5-38.5 26.2-65 44.5-101.2 17.1-33.8 20.7-42.2 23.9-55.8 5.1-21.3 2.8-46.9-6.2-68.5-18.6-44.6-64.2-74.4-116.3-75.7-7.1-.2-14.6-.1-16.5.1zm34.5 16.8c31.7 6.8 58.2 26.8 71.5 54.1 7.3 15 9.2 22.9 9.7 42.4.8 25.8-1.4 35.1-15.9 66.9-11.5 25.3-20.1 46.8-26.8 67.1-10.3 31.3-18 65.4-18.3 81.2l-.2 7.6-6.8-2.3c-14.6-4.9-40.5-6.8-55-4-6.8 1.3-6.9 1.3-6.3-.8.3-1.2.6-7.2.6-13.5v-11.3l3.4 3c7.4 6.5 25.1 10.7 41.1 9.9 11.7-.6 16.3-1.8 20.5-5.3 4.2-3.6 4-7.3-.6-11.4-7.6-6.6-20.8-10.3-37.4-10.4-13-.1-20.7 1.4-25 5l-2.8 2.4-1.7-7.3c-5-20.4-15.1-39.4-37.7-70.5-28.2-38.9-36.2-56.1-38.9-83.3-1.6-16.7-.7-32.9 2.5-45.3 10.1-39 43.5-68.3 86-75.2 9.8-1.6 28.3-1.1 38.1 1zM490 165.9c-26.6 6-60.9 22.9-75.2 37.2-14.7 14.7.1 18.1 32 7.4 30.1-10.1 62.3-29.9 64.8-40.1 1.5-6-7-7.7-21.6-4.5zM1.7 187.1c-4.3 2.5-.2 9.8 10.2 18.3 27.5 22.4 78.3 41.8 86.9 33.3 7-7-25.3-31.6-59.3-45.2-16.1-6.4-32.8-9.3-37.8-6.4zM228.8 484.3c-6.9 2-9.8 4.2-9.8 7.6 0 7.8 15.6 15.2 39.2 18.7 23.7 3.5 43.8-.5 43.8-8.7 0-4.7-12.1-11.7-26.9-15.6-11.8-3.1-38.3-4.2-46.3-2z"/></svg>
+</file>
+
+<file path="assets/static/site.webmanifest">
+{
+    "name": "",
+    "short_name": "",
+    "icons": [
+        {
+            "src": "/android-chrome-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/android-chrome-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "theme_color": "#ffffff",
+    "background_color": "#ffffff",
+    "display": "standalone"
+}
+</file>
+
+<file path="assets/.yarnrc">
+--modules-folder /node_modules
+</file>
+
+<file path="assets/esbuild.config.mjs">
+import * as esbuild from 'esbuild'
+import copyStaticFiles from 'esbuild-copy-static-files'
+
+let minify = false
+let sourcemap = true
+let watch = true
+
+if (process.env.NODE_ENV === 'production') {
+  minify = true
+  sourcemap = false
+  watch = false
+}
+
+const config = {
+  entryPoints: ['./js/app.js'],
+  outfile: '../public/js/app.js',
+  bundle: true,
+  minify: minify,
+  sourcemap: sourcemap,
+  plugins: [copyStaticFiles()],
+}
+
+if (watch) {
+  let context = await esbuild.context({...config, logLevel: 'info'})
+  await context.watch()
+} else {
+  esbuild.build(config)
+}
+</file>
+
+<file path="bin/docker-entrypoint-web">
+#!/usr/bin/env bash
+
+set -e
+
+# Always keep this here as it ensures your latest built assets make their way
+# into your volume persisted public directory.
+cp -r /public /app
+
+exec "$@"
+</file>
+
+<file path="db/script.py.mako">
+"""${message}
+
+Revision ID: ${up_revision}
+Revises: ${down_revision | comma,n}
+Create Date: ${create_date}
+
+"""
+from alembic import op
+import sqlalchemy as sa
+${imports if imports else ""}
+
+# revision identifiers, used by Alembic.
+revision = ${repr(up_revision)}
+down_revision = ${repr(down_revision)}
+branch_labels = ${repr(branch_labels)}
+depends_on = ${repr(depends_on)}
+
+
+def upgrade():
+    ${upgrades if upgrades else "pass"}
+
+
+def downgrade():
+    ${downgrades if downgrades else "pass"}
+</file>
+
+<file path="db/seeds.py">
+# This file should contain records you want created when you run flask db seed.
+#
+# Example:
+# from yourapp.models import User
+
+
+# initial_user = {
+#     'username': 'superadmin'
+# }
+# if User.find_by_username(initial_user['username']) is None:
+#     User(**initial_user).save()
+</file>
+
+<file path="hello/page/templates/page/home.html">
+{% extends "layouts/index.html" %}
+
+{% block title %}Docker + Flask{% endblock %}
+
+{% block body %}
+  <div class="flex justify-center pt-24 pb-12 px-2 sm:px-0">
+    <img src="{{ static_url_for('static', filename='images/flask.png') }}"
+         width="480" height="188" alt="Flask logo" />
+  </div>
+
+  <p class="text-center text-lg">
+   🚀 Learn to Build a SAAS App with Flask at:
+    <strong>
+      <a class="border-b border-gray-900 mb-1" href="https://buildasaasappwithflask.com?ref=docker-flask-example">https://buildasaasappwithflask.com</a>
+    </strong>
+  </p>
+
+  <p class="text-center text-lg mt-6">
+   🐳 Learn the Docker fundamentals at:
+    <strong>
+      <a class="border-b border-gray-900 mb-1" href="https://diveintodocker.com?ref=docker-flask-example">https://diveintodocker.com</a>
+    </strong>
+  </p>
+{% endblock %}
+</file>
+
+<file path="hello/up/views.py">
+from flask import Blueprint
+from sqlalchemy import text
+
+from hello.extensions import db
+from hello.initializers import redis
+
+up = Blueprint("up", __name__, template_folder="templates", url_prefix="/up")
+
+
+@up.get("/")
+def index():
+    return ""
+
+
+@up.get("/databases")
+def databases():
+    redis.ping()
+    with db.engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+    return ""
+</file>
+
+<file path="hello/extensions.py">
+from flask_debugtoolbar import DebugToolbarExtension
+from flask_sqlalchemy import SQLAlchemy
+from flask_static_digest import FlaskStaticDigest
+
+debug_toolbar = DebugToolbarExtension()
+db = SQLAlchemy()
+flask_static_digest = FlaskStaticDigest()
+</file>
+
+<file path="hello/initializers.py">
+from redis import Redis
+
+from config.settings import REDIS_URL
+
+redis = Redis.from_url(REDIS_URL)
+</file>
+
+<file path="lib/test.py">
 import pytest
-from pathlib import Path
-import git
-from mcp_server_git.server import git_checkout, git_branch
-import shutil
 
-@pytest.fixture
-def test_repository(tmp_path: Path):
-    repo_path = tmp_path / "temp_test_repo"
-    test_repo = git.Repo.init(repo_path)
 
-    Path(repo_path / "test.txt").write_text("test")
-    test_repo.index.add(["test.txt"])
-    test_repo.index.commit("initial commit")
+class ViewTestMixin(object):
+    """
+    Automatically load in a session and client, this is common for a lot of
+    tests that work with views.
+    """
 
-    yield test_repo
+    @pytest.fixture(autouse=True)
+    def set_common_fixtures(self, session, client):
+        self.session = session
+        self.client = client
+</file>
 
-    shutil.rmtree(repo_path)
+<file path="test/hello/page/test_views.py">
+from flask import url_for
 
-def test_git_checkout_existing_branch(test_repository):
-    test_repository.git.branch("test-branch")
-    result = git_checkout(test_repository, "test-branch")
+from lib.test import ViewTestMixin
 
-    assert "Switched to branch 'test-branch'" in result
-    assert test_repository.active_branch.name == "test-branch"
 
-def test_git_checkout_nonexistent_branch(test_repository):
+class TestPage(ViewTestMixin):
+    def test_home_page(self):
+        """Home page should respond with a success 200."""
+        response = self.client.get(url_for("page.home"))
 
-    with pytest.raises(git.GitCommandError):
-        git_checkout(test_repository, "nonexistent-branch")
+        assert response.status_code == 200
+</file>
 
-def test_git_branch_local(test_repository):
-    test_repository.git.branch("new-branch-local")
-    result = git_branch(test_repository, "local")
-    assert "new-branch-local" in result
+<file path="test/hello/up/test_views.py">
+from flask import url_for
 
-def test_git_branch_remote(test_repository):
-    # GitPython does not easily support creating remote branches without a remote.
-    # This test will check the behavior when 'remote' is specified without actual remotes.
-    result = git_branch(test_repository, "remote")
-    assert "" == result.strip()  # Should be empty if no remote branches
+from lib.test import ViewTestMixin
 
-def test_git_branch_all(test_repository):
-    test_repository.git.branch("new-branch-all")
-    result = git_branch(test_repository, "all")
-    assert "new-branch-all" in result
 
-def test_git_branch_contains(test_repository):
-    # Create a new branch and commit to it
-    test_repository.git.checkout("-b", "feature-branch")
-    Path(test_repository.working_dir / Path("feature.txt")).write_text("feature content")
-    test_repository.index.add(["feature.txt"])
-    commit = test_repository.index.commit("feature commit")
-    test_repository.git.checkout("master")
+class TestUp(ViewTestMixin):
+    def test_up(self):
+        """Up should respond with a success 200."""
+        response = self.client.get(url_for("up.index"))
 
-    result = git_branch(test_repository, "local", contains=commit.hexsha)
-    assert "feature-branch" in result
-    assert "master" not in result
+        assert response.status_code == 200
 
-def test_git_branch_not_contains(test_repository):
-    # Create a new branch and commit to it
-    test_repository.git.checkout("-b", "another-feature-branch")
-    Path(test_repository.working_dir / Path("another_feature.txt")).write_text("another feature content")
-    test_repository.index.add(["another_feature.txt"])
-    commit = test_repository.index.commit("another feature commit")
-    test_repository.git.checkout("master")
+    def test_up_databases(self):
+        """Up databases should respond with a success 200."""
+        response = self.client.get(url_for("up.databases"))
 
-    result = git_branch(test_repository, "local", not_contains=commit.hexsha)
-    assert "another-feature-branch" not in result
-    assert "master" in result
+        assert response.status_code == 200
+</file>
+
+<file path="test/conftest.py">
+import pytest
+
+from config import settings
+from hello.app import create_app
+from hello.extensions import db as _db
+
+
+@pytest.fixture(scope="session")
+def app():
+    """
+    Setup our flask test app, this only gets executed once.
+
+    :return: Flask app
+    """
+    db_uri = settings.SQLALCHEMY_DATABASE_URI
+
+    if "?" in db_uri:
+        db_uri = db_uri.replace("?", "_test?")
+    else:
+        db_uri = f"{db_uri}_test"
+
+    params = {
+        "DEBUG": False,
+        "TESTING": True,
+        "WTF_CSRF_ENABLED": False,
+        "SQLALCHEMY_DATABASE_URI": db_uri,
+    }
+
+    _app = create_app(settings_override=params)
+
+    # Establish an application context before running the tests.
+    ctx = _app.app_context()
+    ctx.push()
+
+    yield _app
+
+    ctx.pop()
+
+
+@pytest.fixture(scope="function")
+def client(app):
+    """
+    Setup an app client, this gets executed for each test function.
+
+    :param app: Pytest fixture
+    :return: Flask app client
+    """
+    yield app.test_client()
+
+
+@pytest.fixture(scope="session")
+def db(app):
+    """
+    Setup our database, this only gets executed once per session.
+
+    :param app: Pytest fixture
+    :return: SQLAlchemy database session
+    """
+    _db.drop_all()
+    _db.create_all()
+
+    return _db
+
+
+@pytest.fixture(scope="function")
+def session(db):
+    """
+    Allow very fast tests by using rollbacks and nested sessions. This does
+    require that your database supports SQL savepoints, and Postgres does.
+
+    Read more about this at:
+    http://stackoverflow.com/a/26624146
+
+    :param db: Pytest fixture
+    :return: None
+    """
+    db.session.begin_nested()
+
+    yield db.session
+
+    db.session.rollback()
 </file>
 
 <file path=".gitignore">
-__pycache__
-.venv
+# Mostly created by https://www.gitignore.io
+
+
+### App #######################################################################
+
+public/*
+!public/.keep
+
+.env*
+!.env.example
+docker-compose.override.yml
+
+
+### Python ####################################################################
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytestdebug.log
+
+# Translations
+*.mo
+*.pot
+
+# Flask stuff
+instance/
+.webassets-cache
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# Sphinx documentation
+docs/_build/
+doc/_build/
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+__pypackages__/
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# profiling data
+.prof
+
+
+### Node ######################################################################
+
+# Dependency directories
+assets/node_modules/
+
+# Optional eslint cache
+.eslintcache
+
+
+### OSX #######################################################################
+
+# General
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon must end with two \r
+Icon
+
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+
+### Vim #######################################################################
+
+# Swap
+[._]*.s[a-v][a-z]
+!*.svg  # comment out if you don't need vector files
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Session
+Session.vim
+Sessionx.vim
+
+# Temporary
+.netrwhist
+# Auto-generated tag files
+tags
+# Persistent undo
+[._]*.un~
+
+
+### VSCode ####################################################################
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+
+### Emacs #####################################################################
+
+# -*- mode: gitignore; -*-
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Org-mode
+.org-id-locations
+*_archive
+
+# flymake-mode
+*_flymake.*
+
+# eshell files
+/eshell/history
+/eshell/lastdir
+
+# elpa packages
+/elpa/
+
+# reftex files
+*.rel
+
+# AUCTeX auto folder
+/auto/
+
+# cask packages
+.cask/
+dist/
+
+# Flycheck
+flycheck_*.el
+
+# server auth directory
+/server/
+
+# projectiles files
+.projectile
+
+# directory configuration
+.dir-locals.el
+
+# network security
+/network-security.data
 </file>
 
-<file path=".python-version">
-3.10
-</file>
+<file path="alembic.ini">
+# A generic, single database configuration.
 
-<file path="Dockerfile">
-# Use a Python image with uv pre-installed
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS uv
+[alembic]
+# path to migration scripts
+script_location = db/
 
-# Install the project into `/app`
-WORKDIR /app
+# template used to generate migration files
+# file_template = %%(rev)s_%%(slug)s
 
-# Enable bytecode compilation
-ENV UV_COMPILE_BYTECODE=1
+# timezone to use when rendering the date
+# within the migration file as well as the filename.
+# string value is passed to dateutil.tz.gettz()
+# leave blank for localtime
+# timezone =
 
-# Copy from the cache instead of linking since it's a mounted volume
-ENV UV_LINK_MODE=copy
+# max length of characters to apply to the
+# "slug" field
+# truncate_slug_length = 40
 
-# Install the project's dependencies using the lockfile and settings
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project --no-dev --no-editable
+# set to 'true' to run the environment during
+# the 'revision' command, regardless of autogenerate
+# revision_environment = false
 
-# Then, add the rest of the project source code and install it
-# Installing separately from its dependencies allows optimal layer caching
-ADD . /app
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-editable
+# set to 'true' to allow .pyc and .pyo files without
+# a source .py file to be detected as revisions in the
+# versions/ directory
+# sourceless = false
 
-FROM python:3.12-slim-bookworm
+# version location specification; this defaults
+# to foo/versions.  When using multiple version
+# directories, initial revisions must be specified with --version-path
+# version_locations = %(here)s/bar %(here)s/bat foo/versions
 
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+# the output encoding used when revision files
+# are written from script.py.mako
+# output_encoding = utf-8
 
-WORKDIR /app
- 
-COPY --from=uv /root/.local /root/.local
-COPY --from=uv --chown=app:app /app/.venv /app/.venv
+[post_write_hooks]
+# post_write_hooks defines scripts or Python functions that are run
+# on newly generated revision scripts.  See the documentation for further
+# detail and examples
 
-# Place executables in the environment at the front of the path
-ENV PATH="/app/.venv/bin:$PATH"
+# format using "black" - use the console_scripts runner, against the entrypoint
+# hooks=black
+# black.type=console_scripts
+# black.entrypoint=black
+# black.options=-l 79
 
-# when running the container, add --db-path and a bind mount to the host's db file
-ENTRYPOINT ["mcp-server-git"]
+# Logging configuration
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARN
+handlers = console
+qualname =
+
+[logger_sqlalchemy]
+level = WARN
+handlers =
+qualname = sqlalchemy.engine
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S
 </file>
 
 <file path="LICENSE">
-Copyright (c) 2024 Anthropic, PBC.
+The MIT License (MIT)
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Copyright (c) 2020 Nick Janetakis <nick.janetakis@gmail.com>
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+'Software'), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+</file>
+
+<file path=".github/FUNDING.yml">
+---
+
+github: "nickjj"
+custom: ["https://www.paypal.me/nickjanetakis"]
+</file>
+
+<file path="assets/css/app.css">
+@import "tailwindcss" source("/app");
+</file>
+
+<file path="assets/tailwind.config.js">
+export default {
+  plugins: ["@tailwindcss/postcss"],
+};
+</file>
+
+<file path="config/settings.py">
+import os
+
+from distutils.util import strtobool
+
+SECRET_KEY = os.environ["SECRET_KEY"]
+DEBUG = bool(strtobool(os.getenv("FLASK_DEBUG", "false")))
+
+SERVER_NAME = os.getenv(
+    "SERVER_NAME", "localhost:{0}".format(os.getenv("PORT", "8000"))
+)
+# SQLAlchemy.
+pg_user = os.getenv("POSTGRES_USER", "hello")
+pg_pass = os.getenv("POSTGRES_PASSWORD", "password")
+pg_host = os.getenv("POSTGRES_HOST", "postgres")
+pg_port = os.getenv("POSTGRES_PORT", "5432")
+pg_db = os.getenv("POSTGRES_DB", pg_user)
+db = f"postgresql+psycopg://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_db}"
+SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", db)
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+# Redis.
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+
+# Celery.
+CELERY_CONFIG = {
+    "broker_url": REDIS_URL,
+    "result_backend": REDIS_URL,
+    "include": [],
+}
+</file>
+
+<file path="db/env.py">
+from logging.config import fileConfig
+
+from alembic import context
+from sqlalchemy import engine_from_config, pool
+
+from hello.app import create_app
+
+# There's no access to current_app here so we must create our own app.
+app = create_app()
+db_uri = app.config["SQLALCHEMY_DATABASE_URI"]
+db = app.extensions["sqlalchemy"]
+
+# Provide access to the values within alembic.ini.
+config = context.config
+
+# Sets up Python logging.
+fileConfig(config.config_file_name)
+
+# Sets up metadata for autogenerate support,
+config.set_main_option("sqlalchemy.url", db_uri)
+target_metadata = db.metadata
+
+# Configure anything else you deem important, example:
+# my_important_option = config.get_main_option("my_important_option")
+
+
+def run_migrations_offline():
+    """
+    Run migrations in 'offline' mode.
+
+    This configures the context with just a URL and not an Engine, though an
+    Engine is acceptable here as well. By skipping the Engine creation we
+    don't even need a DBAPI to be available.
+
+    Calls to context.execute() here emit the given string to the script output.
+    """
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online():
+    """
+    Run migrations in 'online' mode.
+
+    In this scenario we need to create an Engine and associate a connection
+    with the context.
+    """
+
+    # Auto-generated migrations are pretty sketchy but if you use them this
+    # will prevent Alembic from creating an empty migration if nothing changed.
+    # Source: https://alembic.sqlalchemy.org/en/latest/cookbook.html
+    def process_revision_directives(context, revision, directives):
+        if config.cmd_opts.autogenerate:
+            script = directives[0]
+            if script.upgrade_ops.is_empty():
+                directives[:] = []
+
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            process_revision_directives=process_revision_directives,
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+</file>
+
+<file path="hello/templates/layouts/index.html">
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>{% block title %}{% endblock %}</title>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A production ready example Flask app that's using Docker and Docker Compose.">
+
+    <link rel="stylesheet" href="{{ static_url_for('static', filename='css/app.css') }}">
+    <script defer src="{{ static_url_for('static', filename='js/app.js') }}"></script>
+
+    {# Generated with: https://realfavicongenerator.net/ #}
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#61b9d2">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="theme-color" content="#ffffff">
+  </head>
+
+  <body class="flex flex-col h-screen justify-between">
+    <div class="bg-gray-700">
+      <div class="max-w-screen-lg mx-auto py-3 px-3 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between flex-wrap">
+          <div class="flex-1 flex items-center">
+            <span class="flex p-2 rounded-lg bg-gray-900">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </span>
+            <p class="ml-3 font-medium text-white truncate">
+              Flask {{ flask_ver }} and Python {{ python_ver }}
+            </p>
+          </div>
+          <div class="mt-2 order-3 w-full sm:mt-0 sm:w-auto">
+            <div class="rounded-md shadow-xs">
+              <span class="flex items-center justify-center px-4 py-2 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-gray-500">
+                DEBUG = {{ debug }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main class="max-w-screen-lg mx-auto mb-auto">
+      {% block body %}{% endblock %}
+    </main>
+
+    <footer class="text-center mt-6 pb-6 h-10">
+      <p class="text-gray-500">
+        <a class="border-b mb-1" href="https://github.com/nickjj/docker-flask-example">Coded</a>
+        with
+        <svg class="h-5 w-5 text-red-600 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+        </svg>
+        by
+        <a class="border-b mb-1" href="https://nickjanetakis.com">Nick Janetakis</a>
+      </p>
+    </footer>
+  </body>
+</html>
+</file>
+
+<file path="hello/app.py">
+from celery import Celery, Task
+from flask import Flask
+from werkzeug.debug import DebuggedApplication
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+from hello.extensions import db, debug_toolbar, flask_static_digest
+from hello.page.views import page
+from hello.up.views import up
+
+
+def create_celery_app(app=None):
+    """
+    Create a new Celery app and tie together the Celery config to the app's
+    config. Wrap all tasks in the context of the application.
+
+    :param app: Flask app
+    :return: Celery app
+    """
+    app = app or create_app()
+
+    class FlaskTask(Task):
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return self.run(*args, **kwargs)
+
+    celery = Celery(app.import_name, task_cls=FlaskTask)
+    celery.conf.update(app.config.get("CELERY_CONFIG", {}))
+    celery.set_default()
+    app.extensions["celery"] = celery
+
+    return celery
+
+
+def create_app(settings_override=None):
+    """
+    Create a Flask application using the app factory pattern.
+
+    :param settings_override: Override settings
+    :return: Flask app
+    """
+    app = Flask(__name__, static_folder="../public", static_url_path="")
+
+    app.config.from_object("config.settings")
+
+    if settings_override:
+        app.config.update(settings_override)
+
+    middleware(app)
+
+    app.register_blueprint(up)
+    app.register_blueprint(page)
+
+    extensions(app)
+
+    return app
+
+
+def extensions(app):
+    """
+    Register 0 or more extensions (mutates the app passed in).
+
+    :param app: Flask application instance
+    :return: None
+    """
+    debug_toolbar.init_app(app)
+    db.init_app(app)
+    flask_static_digest.init_app(app)
+
+    return None
+
+
+def middleware(app):
+    """
+    Register 0 or more middleware (mutates the app passed in).
+
+    :param app: Flask application instance
+    :return: None
+    """
+    # Enable the Flask interactive debugger in the brower for development.
+    if app.debug:
+        app.wsgi_app = DebuggedApplication(app.wsgi_app, evalex=True)
+
+    # Set the real IP address into request.remote_addr when behind a proxy.
+    app.wsgi_app = ProxyFix(app.wsgi_app)
+
+    return None
+
+
+celery_app = create_celery_app()
+</file>
+
+<file path=".dockerignore">
+.git/
+.ruff_cache
+.pytest_cache/
+__pycache__/
+assets/node_modules/
+public/
+
+.coverage
+.dockerignore
+.env*
+!.env.example
+celerybeat-schedule
+docker-compose.override.yml
+</file>
+
+<file path=".editorconfig">
+[[sh]]
+indent_style = space
+indent_size = 2
+
+[[bash]]
+indent_style = space
+indent_size = 2
+</file>
+
+<file path="bin/rename-project">
+#!/usr/bin/env bash
+
+set -eo pipefail
+
+APP_NAME="${1}"
+MODULE_NAME="${2}"
+
+FIND_APP_NAME="hello"
+FIND_MODULE_NAME="Hello"
+FIND_FRAMEWORK="flask"
+
+if [ -z "${APP_NAME}" ] || [ -z "${MODULE_NAME}" ]; then
+  echo "You must supply both an app and module name, example: ${0} myapp MyApp"
+  exit 1
+fi
+
+if [ "${APP_NAME}" = "${FIND_APP_NAME}" ]; then
+  echo "Your new app name must be different than the current app name"
+  exit 1
+fi
+
+cat <<EOF
+When renaming your project you'll need to re-create a new database.
+
+This can easily be done with Docker, but before this script does it
+please agree that it's ok for this script to delete your current
+project's database(s) by removing any associated Docker volumes.
+
+EOF
+
+while true; do
+  read -p "Run docker compose down -v (y/n)? " -r yn
+  case "${yn}" in
+  [Yy]*)
+    printf "\n--------------------------------------------------------\n"
+    docker compose down -v
+    printf -- "--------------------------------------------------------\n"
+
+    break
+    ;;
+  [Nn]*) exit ;;
+  *) echo "" ;;
+  esac
+done
+
+# -----------------------------------------------------------------------------
+# The core of the script which renames a few things.
+# -----------------------------------------------------------------------------
+find . -type f -exec \
+  perl -i \
+  -pe "s/(${FIND_APP_NAME}${FIND_FRAMEWORK}|${FIND_APP_NAME})/${APP_NAME}/g;" \
+  -pe "s/${FIND_MODULE_NAME}/${MODULE_NAME}/g;" {} + &&
+  mv "${FIND_APP_NAME}" "${APP_NAME}" &&
+  mv "test/${FIND_APP_NAME}" "test/${APP_NAME}"
+# -----------------------------------------------------------------------------
+
+cat <<EOF
+
+--------------------------------------------------------
+Your project has been renamed successfully!
+--------------------------------------------------------
+
+EOF
+
+init_git_repo() {
+  [ -d .git/ ] && rm -rf .git/
+
+  cat <<EOF
+
+--------------------------------------------------------
+$(git init)
+--------------------------------------------------------
+EOF
+
+  git symbolic-ref HEAD refs/heads/main
+}
+
+while true; do
+  read -p "Do you want to init a new local git repo (y/n)? " -r yn
+  case "${yn}" in
+  [Yy]*)
+    init_git_repo
+    break
+    ;;
+  [Nn]*) break ;;
+  *) echo "" ;;
+  esac
+done
+
+cat <<EOF
+
+We're done here. Everything worked!
+
+If you're happy with your new project's name you can delete this
+script by running: rm bin/rename-project
+
+Or you can keep it around in case you decide to change your project's
+name later on after developing it for a bit. You can re-run this
+script as many times as you want until you're happy.
+
+Check out the rest of the README on GitHub to wrap things up:
+
+https://github.com/nickjj/docker-${FIND_FRAMEWORK}-example#start-and-setup-the-project
+EOF
+</file>
+
+<file path="config/gunicorn.py">
+# -*- coding: utf-8 -*-
+
+import multiprocessing
+import os
+
+from distutils.util import strtobool
+
+bind = f"0.0.0.0:{os.getenv('PORT', '8000')}"
+accesslog = "-"
+access_log_format = (
+    "%(h)s %(l)s %(u)s %(t)s '%(r)s' %(s)s %(b)s '%(f)s' '%(a)s' in %(D)sµs"  # noqa: E501
+)
+
+workers = int(os.getenv("WEB_CONCURRENCY", multiprocessing.cpu_count() * 2))
+threads = int(os.getenv("PYTHON_MAX_THREADS", 1))
+
+reload = bool(strtobool(os.getenv("WEB_RELOAD", "false")))
+
+timeout = int(os.getenv("WEB_TIMEOUT", 120))
+</file>
+
+<file path="hello/page/views.py">
+import os
+from importlib.metadata import version
+
+from flask import Blueprint, render_template
+
+from config.settings import DEBUG
+
+page = Blueprint("page", __name__, template_folder="templates")
+
+
+@page.get("/")
+def home():
+    return render_template(
+        "page/home.html",
+        flask_ver=version("flask"),
+        python_ver=os.environ["PYTHON_VERSION"],
+        debug=DEBUG,
+    )
+</file>
+
+<file path=".env.example">
+# Default values are optimized for production to avoid having to configure
+# much in production.
+#
+# However it should be easy to get going in development too. If you see an
+# uncommented option that means it's either mandatory to set or it's being
+# overwritten in development to make your life easier.
+
+# Enable BuildKit by default:
+#   https://docs.docker.com/develop/develop-images/build_enhancements
+export DOCKER_BUILDKIT=1
+
+# Rather than use the directory name, let's control the name of the project.
+export COMPOSE_PROJECT_NAME=helloflask
+
+# In development we want all services to start but in production you don't
+# need the asset watchers to run since assets get built into the image.
+#
+# You can even choose not to run postgres and redis in prod if you plan to use
+# managed cloud services. Everything "just works", even optional depends_on!
+#export COMPOSE_PROFILES=postgres,redis,web,worker
+export COMPOSE_PROFILES=postgres,redis,assets,web,worker
+
+# If you're running native Linux and your uid:gid isn't 1000:1000 you can set
+# these to match your values before you build your image. You can check what
+# your uid:gid is by running `id` from your terminal.
+#export UID=1000
+#export GID=1000
+
+# In development avoid writing out bytecode to __pycache__ directories.
+#export PYTHONDONTWRITEBYTECODE=
+export PYTHONDONTWRITEBYTECODE=true
+
+# You should generate a random string of 99+ characters for this value in prod.
+# You can generate secure secrets by running: ./run flask secrets
+export SECRET_KEY=insecure_key_for_dev
+
+# Which environment is running?
+# For Flask, it should be: "true" or "false"
+# For Node, it should be: "development" or "production"
+#export FLASK_DEBUG=false
+#export NODE_ENV=production
+export FLASK_DEBUG=true
+export NODE_ENV=development
+
+# In development with Docker Desktop / Linux the default value should work.
+# If you have Docker running in a custom VM, put the VM's IP here instead.
+#
+# In production you'll want to set this to your domain name or whatever you
+# plan to access in your browser, such as example.com.
+#export SERVER_NAME=localhost:8000
+
+# The bind port for gunicorn.
+#
+# Be warned that if you change this value you'll need to change 8000 in both
+# your Dockerfile and in a few spots in compose.yaml due to the nature of
+# how this value can be set (Docker Compose doesn't support nested ENV vars).
+#export PORT=8000
+
+# How many workers and threads should your app use? WEB_CONCURRENCY defaults
+# to the server's CPU count * 2. That is a good starting point.
+#export WEB_CONCURRENCY=
+#export PYTHON_MAX_THREADS=1
+
+# Do you want code reloading to work with the gunicorn app server?
+#export WEB_RELOAD=false
+export WEB_RELOAD=true
+
+# Configure the timeout value in seconds for gunicorn.
+#export WEB_TIMEOUT=120
+
+# You'll always want to set POSTGRES_USER and POSTGRES_PASSWORD since the
+# postgres Docker image uses them for its default database user and password.
+export POSTGRES_USER=hello
+export POSTGRES_PASSWORD=password
+#export POSTGRES_DB=hello
+#export POSTGRES_HOST=postgres
+#export POSTGRES_PORT=5432
+
+# Connection string to Redis. This will be used to connect directly to Redis
+# and for Celery. You can always split up your Redis servers later if needed.
+#export REDIS_URL=redis://redis:6379/0
+
+# You can choose between DEBUG, INFO, WARNING, ERROR, CRITICAL or FATAL.
+# DEBUG tends to get noisy but it could be useful for troubleshooting.
+#export CELERY_LOG_LEVEL=info
+
+# Should Docker restart your containers if they go down in unexpected ways?
+#export DOCKER_RESTART_POLICY=unless-stopped
+export DOCKER_RESTART_POLICY=no
+
+# What health check test command do you want to run? In development, having it
+# curl your web server will result in a lot of log spam, so setting it to
+# /bin/true is an easy way to make the health check do basically nothing.
+#export DOCKER_WEB_HEALTHCHECK_TEST=curl localhost:8000/up
+export DOCKER_WEB_HEALTHCHECK_TEST=/bin/true
+
+# What ip:port should be published back to the Docker host for the app server?
+#
+# If you have a port conflict because something else is using 8000 then you
+# can either stop that process or change 8000 to be something else.
+#
+# Use the default in production to avoid having gunicorn directly accessible on
+# the internet since it'll very likely be behind nginx or a load balancer.
+#
+# This is being overwritten in dev to be compatible with more dev environments,
+# such as accessing your site on another local device (phone, tablet, etc.).
+#export DOCKER_WEB_PORT_FORWARD=127.0.0.1:8000
+export DOCKER_WEB_PORT_FORWARD=8000
+
+# What volume path should be used? In dev we want to volume mount everything
+# so that we can develop our code without rebuilding our Docker images.
+#export DOCKER_WEB_VOLUME=./public:/app/public
+export DOCKER_WEB_VOLUME=.:/app
+
+# What CPU and memory constraints will be added to your services? When left at
+# 0, they will happily use as much as needed.
+#export DOCKER_POSTGRES_CPUS=0
+#export DOCKER_POSTGRES_MEMORY=0
+#export DOCKER_REDIS_CPUS=0
+#export DOCKER_REDIS_MEMORY=0
+#export DOCKER_WEB_CPUS=0
+#export DOCKER_WEB_MEMORY=0
+#export DOCKER_WORKER_CPUS=0
+#export DOCKER_WORKER_MEMORY=0
+</file>
+
+<file path=".hadolint.yaml">
+---
+failure-threshold: "style"
+ignored:
+  - "DL3008"
+</file>
+
+<file path=".github/workflows/ci.yml">
+name: "CI"
+
+on:
+  pull_request:
+    branches:
+      - "*"
+  push:
+    branches:
+      - "main"
+      - "master"
+  schedule:
+    - cron: "30 12 * * *"
+
+jobs:
+  test:
+    runs-on: "ubuntu-22.04"
+
+    steps:
+      - uses: "actions/checkout@v4"
+
+      - name: "Install CI dependencies"
+        run: |
+          ./run ci:install-deps
+
+      - name: "Test"
+        run: |
+          # Remove volumes in CI to avoid permission errors due to UID / GID.
+          sed -i "s|.:/app|/tmp:/tmp|g" .env*
+          sed -i "s|.:/app|/tmp:/tmp|g" compose.yaml
+
+          ./run ci:test
+</file>
+
+<file path="bin/uv-install">
+#!/usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+
+# Ensure we always have a valid up to date lock file.
+if ! test -f uv.lock || ! uv lock --check 2>/dev/null; then
+  uv lock
+fi
+
+# Otherwise, use the existing lock file exactly how it is defined.
+uv sync --frozen --no-install-project
 </file>
 
 <file path="pyproject.toml">
 [project]
-name = "mcp-server-git"
-version = "0.6.2"
-description = "A Model Context Protocol server providing tools to read, search, and manipulate Git repositories programmatically via LLMs"
+name = "hello"
+version = "0.1.0"
+description = "An example Flask app running in Docker."
 readme = "README.md"
-requires-python = ">=3.10"
-authors = [{ name = "Anthropic, PBC." }]
-maintainers = [{ name = "David Soria Parra", email = "davidsp@anthropic.com" }]
-keywords = ["git", "mcp", "llm", "automation"]
-license = { text = "MIT" }
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-]
+requires-python = ">=3.13"
 dependencies = [
-    "click>=8.1.7",
-    "gitpython>=3.1.43",
-    "mcp>=1.0.0",
-    "pydantic>=2.0.0",
+  "alembic==1.16.4",
+  "celery==5.5.3",
+  "flask==3.1.1",
+  "flask-db==0.4.1",
+  "flask-debugtoolbar==0.16.0",
+  "flask-secrets==0.1.0",
+  "flask-sqlalchemy==3.1.1",
+  "flask-static-digest==0.4.1",
+  "gunicorn==23.0.0",
+  "jinja2==3.1.6",
+  "psycopg==3.2.9",
+  "pytest==8.4.1",
+  "pytest-cov==6.2.1",
+  "redis==6.2.0",
+  "ruff==0.12.7",
+  "setuptools==80.9.0",
+  "sqlalchemy==2.0.42",
+  "sqlalchemy-utils==0.41.2",
+  "werkzeug==3.1.3",
 ]
 
-[project.scripts]
-mcp-server-git = "mcp_server_git:main"
+[tool.ruff]
+line-length = 79
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[tool.ruff.lint]
+extend-select = ["I", "SIM"]
+</file>
 
-[tool.uv]
-dev-dependencies = ["pyright>=1.1.389", "ruff>=0.7.3", "pytest>=8.0.0"]
+<file path="run">
+#!/usr/bin/env bash
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = "test_*.py"
-python_classes = "Test*"
-python_functions = "test_*"
+set -o errexit
+set -o pipefail
+
+DC="${DC:-exec}"
+
+# If we're running in CI we need to disable TTY allocation for docker compose
+# commands that enable it by default, such as exec and run.
+TTY="${TTY:-}"
+if [[ ! -t 1 ]]; then
+  TTY="-T"
+fi
+
+# -----------------------------------------------------------------------------
+# Helper functions start with _ and aren't listed in this script's help menu.
+# -----------------------------------------------------------------------------
+
+_dc() {
+  # shellcheck disable=SC2086
+  docker compose "${DC}" ${TTY} "${@}"
+}
+
+_dc_run() {
+  DC="run" _dc --no-deps --rm "${@}"
+}
+
+# -----------------------------------------------------------------------------
+
+cmd() {
+  # Run any command you want in the web container
+  _dc web "${@}"
+}
+
+flask() {
+  # Run any Flask commands
+  cmd flask "${@}"
+}
+
+lint:dockerfile() {
+  # Lint Dockerfile
+  docker container run --rm -i \
+    -v "${PWD}/.hadolint.yaml:/.config/hadolint.yaml" \
+    hadolint/hadolint hadolint "${@}" - <Dockerfile
+}
+
+lint:shell() {
+  # Lint shell scripts
+  local cmd=(shellcheck)
+
+  if ! command -v shellcheck >/dev/null 2>&1; then
+    local cmd=(docker container run --rm -i -v "${PWD}:/mnt" koalaman/shellcheck:stable)
+  fi
+
+  find . -type f \
+    ! -path "./.git/*" \
+    ! -path "./.ruff_cache/*" \
+    ! -path "./.pytest_cache/*" \
+    ! -path "./assets/*" \
+    ! -path "./public/*" \
+    -exec grep --quiet '^#!.*sh' {} \; -exec "${cmd[@]}" {} +
+}
+
+lint() {
+  # Lint Python code
+  cmd ruff check "${@}"
+}
+
+format:shell() {
+  # Format shell scripts
+  local cmd=(shfmt)
+
+  if ! command -v shfmt >/dev/null 2>&1; then
+    local cmd=(docker container run --rm -i -v "${PWD}:/mnt" -u "$(id -u):$(id -g)" -w /mnt mvdan/shfmt:v3)
+  fi
+
+  local maybe_write=("--write")
+
+  for arg in "${@}"; do
+    if [ "${arg}" == "-d" ] || [ "${arg}" == "--diff" ]; then
+      unset "maybe_write[0]"
+    fi
+  done
+
+  "${cmd[@]}" "${maybe_write[@]}" "${@}" .
+}
+
+format() {
+  # Format Python code
+  cmd ruff check --fix
+  cmd ruff format "${@}"
+}
+
+quality() {
+  # Perform all code quality commands together
+  lint:dockerfile
+  lint:shell
+  lint
+
+  format:shell
+  format
+}
+
+test() {
+  # Run test suite
+  cmd pytest test/ "${@}"
+}
+
+test:coverage() {
+  # Get test coverage
+  cmd pytest --cov test/ --cov-report term-missing "${@}"
+}
+
+shell() {
+  # Start a shell session in the web container
+  cmd bash "${@}"
+}
+
+psql() {
+  # Connect to PostgreSQL
+  # shellcheck disable=SC1091
+  . .env
+  _dc postgres psql -U "${POSTGRES_USER}" "${@}"
+}
+
+redis-cli() {
+  # Connect to Redis
+  _dc redis redis-cli "${@}"
+}
+
+deps:install() {
+  # Install back-end and / or front-end dependencies
+  local no_build="${1:-}"
+
+  [ -z "${no_build}" ] && docker compose down && docker compose build
+
+  _dc_run js yarn install
+  _dc_run web bin/uv-install
+}
+
+uv() {
+  # Run any uv commands
+  cmd uv "${@}"
+}
+
+uv:outdated() {
+  # List any installed packages that are outdated
+  _dc_run web uv tree --outdated --depth 1 "${@}"
+}
+
+yarn() {
+  # Run any yarn commands
+  _dc js yarn "${@}"
+}
+
+yarn:outdated() {
+  # List any installed packages that are outdated
+  _dc_run js yarn outdated
+}
+
+yarn:build:js() {
+  # Build JS assets, this is meant to be run from within the assets container
+  mkdir -p ../public/js
+  node esbuild.config.mjs
+}
+
+yarn:build:css() {
+  # Build CSS assets, this is meant to be run from within the assets container
+  local args=()
+
+  if [ "${NODE_ENV:-}" == "production" ]; then
+    args=(--minify)
+  else
+    args=(--watch)
+  fi
+
+  mkdir -p ../public/css
+  tailwindcss -i css/app.css -o ../public/css/app.css "${args[@]}"
+}
+
+clean() {
+  # Remove cache and other machine generates files
+  rm -rf public/*.* public/js public/css public/images public/fonts \
+    .ruff_cache/ .pytest_cache/ .coverage celerybeat-schedule
+
+  touch public/.keep
+}
+
+ci:install-deps() {
+  # Install Continuous Integration (CI) dependencies
+  sudo apt-get install -y curl
+  sudo curl \
+    -L https://raw.githubusercontent.com/nickjj/wait-until/v0.2.0/wait-until \
+    -o /usr/local/bin/wait-until && sudo chmod +x /usr/local/bin/wait-until
+}
+
+ci:test() {
+  # Execute Continuous Integration (CI) pipeline
+  lint:dockerfile "${@}"
+  lint:shell
+  format:shell --diff
+
+  cp --no-clobber .env.example .env
+
+  docker compose build
+  docker compose up -d
+
+  # shellcheck disable=SC1091
+  . .env
+  wait-until "docker compose exec -T \
+    -e PGPASSWORD=${POSTGRES_PASSWORD} postgres \
+    psql -U ${POSTGRES_USER} ${POSTGRES_USER} -c 'SELECT 1'"
+
+  docker compose logs
+
+  lint "${@}"
+  format --check --diff
+  flask db reset --with-testdb
+  test "${@}"
+}
+
+help() {
+  printf "%s <task> [args]\n\nTasks:\n" "${0}"
+
+  compgen -A function | grep -v "^_" | cat -n
+
+  printf "\nExtended help:\n  Each task has comments for general usage\n"
+}
+
+# This idea is heavily inspired by: https://github.com/adriancooney/Taskfile
+TIMEFORMAT=$'\nTask completed in %3lR'
+time "${@:-help}"
+</file>
+
+<file path="compose.yaml">
+x-app: &default-app
+  build:
+    context: "."
+    target: "app"
+    args:
+      - "UID=${UID:-1000}"
+      - "GID=${GID:-1000}"
+      - "FLASK_DEBUG=${FLASK_DEBUG:-false}"
+      - "NODE_ENV=${NODE_ENV:-production}"
+  depends_on:
+    postgres:
+      condition: "service_started"
+      required: false
+    redis:
+      condition: "service_started"
+      required: false
+  env_file:
+    - ".env"
+  restart: "${DOCKER_RESTART_POLICY:-unless-stopped}"
+  stop_grace_period: "3s"
+  tty: true
+  volumes:
+    - "${DOCKER_WEB_VOLUME:-./public:/app/public}"
+
+x-assets: &default-assets
+  build:
+    context: "."
+    target: "assets"
+    args:
+      - "UID=${UID:-1000}"
+      - "GID=${GID:-1000}"
+      - "FLASK_DEBUG=${FLASK_DEBUG:-false}"
+      - "NODE_ENV=${NODE_ENV:-production}"
+  env_file:
+    - ".env"
+  profiles: ["assets"]
+  restart: "${DOCKER_RESTART_POLICY:-unless-stopped}"
+  stop_grace_period: "0"
+  tty: true
+  volumes:
+    - ".:/app"
+
+services:
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: "${DOCKER_POSTGRES_CPUS:-0}"
+          memory: "${DOCKER_POSTGRES_MEMORY:-0}"
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      # POSTGRES_DB: "${POSTGRES_DB}"
+    image: "postgres:17.5-bookworm"
+    profiles: ["postgres"]
+    restart: "${DOCKER_RESTART_POLICY:-unless-stopped}"
+    stop_grace_period: "3s"
+    volumes:
+      - "postgres:/var/lib/postgresql/data"
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: "${DOCKER_REDIS_CPUS:-0}"
+          memory: "${DOCKER_REDIS_MEMORY:-0}"
+    image: "redis:8.0.3-bookworm"
+    profiles: ["redis"]
+    restart: "${DOCKER_RESTART_POLICY:-unless-stopped}"
+    stop_grace_period: "3s"
+    volumes:
+      - "redis:/data"
+
+  web:
+    <<: *default-app
+    deploy:
+      resources:
+        limits:
+          cpus: "${DOCKER_WEB_CPUS:-0}"
+          memory: "${DOCKER_WEB_MEMORY:-0}"
+    healthcheck:
+      test: "${DOCKER_WEB_HEALTHCHECK_TEST:-curl localhost:8000/up}"
+      interval: "60s"
+      timeout: "3s"
+      start_period: "5s"
+      retries: 3
+    ports:
+      - "${DOCKER_WEB_PORT_FORWARD:-127.0.0.1:8000}:${PORT:-8000}"
+    profiles: ["web"]
+
+  worker:
+    <<: *default-app
+    command: celery -A "hello.app.celery_app" worker -l "${CELERY_LOG_LEVEL:-info}"
+    entrypoint: []
+    deploy:
+      resources:
+        limits:
+          cpus: "${DOCKER_WORKER_CPUS:-0}"
+          memory: "${DOCKER_WORKER_MEMORY:-0}"
+    profiles: ["worker"]
+
+  js:
+    <<: *default-assets
+    command: "../run yarn:build:js"
+
+  css:
+    <<: *default-assets
+    command: "../run yarn:build:css"
+
+volumes:
+  postgres: {}
+  redis: {}
+</file>
+
+<file path="assets/package.json">
+{
+  "name": "hello",
+  "private": true,
+  "dependencies": {
+    "@tailwindcss/cli": "4.1.11",
+    "@tailwindcss/postcss": "4.1.11",
+    "esbuild": "0.25.8",
+    "esbuild-copy-static-files": "0.1.0",
+    "tailwindcss": "4.1.11"
+  }
+}
+</file>
+
+<file path="Dockerfile">
+FROM node:22.17.1-bookworm-slim AS assets
+LABEL maintainer="Nick Janetakis <nick.janetakis@gmail.com>"
+
+WORKDIR /app/assets
+
+ARG UID=1000
+ARG GID=1000
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends build-essential \
+  && rm -rf /var/lib/apt/lists/* /usr/share/doc /usr/share/man \
+  && apt-get clean \
+  && groupmod -g "${GID}" node && usermod -u "${UID}" -g "${GID}" node \
+  && mkdir -p /node_modules && chown node:node -R /node_modules /app
+
+USER node
+
+COPY --chown=node:node assets/package.json assets/*yarn* ./
+
+RUN yarn install && yarn cache clean
+
+ARG NODE_ENV="production"
+ENV NODE_ENV="${NODE_ENV}" \
+  PATH="${PATH}:/node_modules/.bin" \
+  USER="node"
+
+COPY --chown=node:node . ..
+
+RUN if [ "${NODE_ENV}" != "development" ]; then \
+  ../run yarn:build:js && ../run yarn:build:css; else mkdir -p /app/public; fi
+
+CMD ["bash"]
+
+###############################################################################
+
+FROM python:3.13.5-slim-bookworm AS app-build
+LABEL maintainer="Nick Janetakis <nick.janetakis@gmail.com>"
+
+WORKDIR /app
+
+ARG UID=1000
+ARG GID=1000
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends build-essential curl libpq-dev \
+  && rm -rf /var/lib/apt/lists/* /usr/share/doc /usr/share/man \
+  && apt-get clean \
+  && groupadd -g "${GID}" python \
+  && useradd --create-home --no-log-init -u "${UID}" -g "${GID}" python \
+  && chown python:python -R /app
+
+COPY --from=ghcr.io/astral-sh/uv:0.7.13 /uv /uvx /usr/local/bin/
+
+USER python
+
+COPY --chown=python:python pyproject.toml uv.lock* ./
+COPY --chown=python:python bin/ ./bin
+
+ENV PYTHONUNBUFFERED="true" \
+  PYTHONPATH="." \
+  UV_COMPILE_BYTECODE=1 \
+  UV_PROJECT_ENVIRONMENT="/home/python/.local" \
+  PATH="${PATH}:/home/python/.local/bin" \
+  USER="python"
+
+RUN chmod 0755 bin/* && bin/uv-install
+
+CMD ["bash"]
+
+###############################################################################
+
+FROM python:3.13.5-slim-bookworm AS app
+LABEL maintainer="Nick Janetakis <nick.janetakis@gmail.com>"
+
+WORKDIR /app
+
+ARG UID=1000
+ARG GID=1000
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl libpq-dev \
+  && rm -rf /var/lib/apt/lists/* /usr/share/doc /usr/share/man \
+  && apt-get clean \
+  && groupadd -g "${GID}" python \
+  && useradd --create-home --no-log-init -u "${UID}" -g "${GID}" python \
+  && chown python:python -R /app
+
+USER python
+
+ARG FLASK_DEBUG="false"
+ENV FLASK_DEBUG="${FLASK_DEBUG}" \
+  FLASK_APP="hello.app" \
+  FLASK_SKIP_DOTENV="true" \
+  PYTHONUNBUFFERED="true" \
+  PYTHONPATH="." \
+  UV_PROJECT_ENVIRONMENT="/home/python/.local" \
+  PATH="${PATH}:/home/python/.local/bin" \
+  USER="python"
+
+COPY --chown=python:python --from=assets /app/public /public
+COPY --chown=python:python --from=app-build /home/python/.local /home/python/.local
+COPY --from=app-build /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
+COPY --chown=python:python . .
+
+RUN if [ "${FLASK_DEBUG}" != "true" ]; then \
+  ln -s /public /app/public && SECRET_KEY=dummy flask digest compile && rm -rf /app/public; fi
+
+ENTRYPOINT ["/app/bin/docker-entrypoint-web"]
+
+EXPOSE 8000
+
+CMD ["gunicorn", "-c", "python:config.gunicorn", "hello.app:create_app()"]
 </file>
 
 <file path="README.md">
-# mcp-server-git: A git MCP server
+# 🐳 An example Flask + Docker app
 
-## Overview
+You could use this example app as a base for your new project or as a guide to
+Dockerize your existing Flask app.
 
-A Model Context Protocol server for Git repository interaction and automation. This server provides tools to read, search, and manipulate Git repositories via Large Language Models.
+The example app is minimal but it wires up a number of things you might use in
+a real world Flask app, but at the same time it's not loaded up with a million
+personal opinions.
 
-Please note that mcp-server-git is currently in early development. The functionality and available tools are subject to change and expansion as we continue to develop and improve the server.
+For the Docker bits, everything included is an accumulation of [Docker best
+practices](https://nickjanetakis.com/blog/best-practices-around-production-ready-web-apps-with-docker-compose)
+based on building and deploying dozens of assorted Dockerized web apps since
+late 2014.
 
-### Tools
+**This app is using Flask 3.1.1 and Python 3.13.5**. The screenshot shows
+`X.X.X` since they get updated regularly:
 
-1. `git_status`
-   - Shows the working tree status
-   - Input:
-     - `repo_path` (string): Path to Git repository
-   - Returns: Current status of working directory as text output
+[![Screenshot](.github/docs/screenshot.jpg)](https://github.com/nickjj/docker-flask-example/blob/main/.github/docs/screenshot.jpg?raw=true)
 
-2. `git_diff_unstaged`
-   - Shows changes in working directory not yet staged
-   - Inputs:
-     - `repo_path` (string): Path to Git repository
-     - `context_lines` (number, optional): Number of context lines to show (default: 3)
-   - Returns: Diff output of unstaged changes
+## 🧾 Table of contents
 
-3. `git_diff_staged`
-   - Shows changes that are staged for commit
-   - Inputs:
-     - `repo_path` (string): Path to Git repository
-     - `context_lines` (number, optional): Number of context lines to show (default: 3)
-   - Returns: Diff output of staged changes
+- [Tech stack](#tech-stack)
+- [Notable opinions and extensions](#notable-opinions-and-extensions)
+- [Running this app](#running-this-app)
+- [Files of interest](#files-of-interest)
+  - [`.env`](#env)
+  - [`run`](#run)
+- [Running a script to automate renaming the project](#running-a-script-to-automate-renaming-the-project)
+- [Updating dependencies](#updating-dependencies)
+- [See a way to improve something?](#see-a-way-to-improve-something)
+- [Additional resources](#additional-resources)
+  - [Learn more about Docker and Flask](#learn-more-about-docker-and-flask)
+  - [Deploy to production](#deploy-to-production)
+- [About the author](#about-the-author)
 
-4. `git_diff`
-   - Shows differences between branches or commits
-   - Inputs:
-     - `repo_path` (string): Path to Git repository
-     - `target` (string): Target branch or commit to compare with
-     - `context_lines` (number, optional): Number of context lines to show (default: 3)
-   - Returns: Diff output comparing current state with target
+## 🧬 Tech stack
 
-5. `git_commit`
-   - Records changes to the repository
-   - Inputs:
-     - `repo_path` (string): Path to Git repository
-     - `message` (string): Commit message
-   - Returns: Confirmation with new commit hash
+If you don't like some of these choices that's no problem, you can swap them
+out for something else on your own.
 
-6. `git_add`
-   - Adds file contents to the staging area
-   - Inputs:
-     - `repo_path` (string): Path to Git repository
-     - `files` (string[]): Array of file paths to stage
-   - Returns: Confirmation of staged files
+### Back-end
 
-7. `git_reset`
-   - Unstages all staged changes
-   - Input:
-     - `repo_path` (string): Path to Git repository
-   - Returns: Confirmation of reset operation
+- [PostgreSQL](https://www.postgresql.org/)
+- [SQLAlchemy](https://github.com/sqlalchemy/sqlalchemy)
+- [Redis](https://redis.io/)
+- [Celery](https://github.com/celery/celery)
 
-8. `git_log`
-   - Shows the commit logs
-   - Inputs:
-     - `repo_path` (string): Path to Git repository
-     - `max_count` (number, optional): Maximum number of commits to show (default: 10)
-   - Returns: Array of commit entries with hash, author, date, and message
+### Front-end
 
-9. `git_create_branch`
-   - Creates a new branch
-   - Inputs:
-     - `repo_path` (string): Path to Git repository
-     - `branch_name` (string): Name of the new branch
-     - `start_point` (string, optional): Starting point for the new branch
-   - Returns: Confirmation of branch creation
-10. `git_checkout`
-   - Switches branches
-   - Inputs:
-     - `repo_path` (string): Path to Git repository
-     - `branch_name` (string): Name of branch to checkout
-   - Returns: Confirmation of branch switch
-11. `git_show`
-   - Shows the contents of a commit
-   - Inputs:
-     - `repo_path` (string): Path to Git repository
-     - `revision` (string): The revision (commit hash, branch name, tag) to show
-   - Returns: Contents of the specified commit
-12. `git_init`
-   - Initializes a Git repository
-   - Inputs:
-     - `repo_path` (string): Path to directory to initialize git repo
-   - Returns: Confirmation of repository initialization
+- [esbuild](https://esbuild.github.io/)
+- [TailwindCSS](https://tailwindcss.com/)
+- [Heroicons](https://heroicons.com/)
 
-13. `git_branch`
-   - List Git branches
-   - Inputs:
-     - `repo_path` (string): Path to the Git repository.
-     - `branch_type` (string): Whether to list local branches ('local'), remote branches ('remote') or all branches('all').
-     - `contains` (string, optional): The commit sha that branch should contain. Do not pass anything to this param if no commit sha is specified
-     - `not_contains` (string, optional): The commit sha that branch should NOT contain. Do not pass anything to this param if no commit sha is specified
-   - Returns: List of branches
+#### But what about JavaScript?!
 
-## Installation
+Picking a JS library is a very app specific decision because it depends on
+which library you like and it also depends on if your app is going to be
+mostly Jinja templates with sprinkles of JS or an API back-end.
 
-### Using uv (recommended)
+This isn't an exhaustive list but here's a few reasonable choices depending on
+how you're building your app:
 
-When using [`uv`](https://docs.astral.sh/uv/) no specific installation is needed. We will
-use [`uvx`](https://docs.astral.sh/uv/guides/tools/) to directly run *mcp-server-git*.
+- <https://hotwired.dev/>
+- <https://htmx.org/>
+- <https://github.com/alpinejs/alpine>
+- <https://vuejs.org/>
+- <https://reactjs.org/>
+- <https://jquery.com/>
 
-### Using PIP
+On the bright side with esbuild being set up you can use any (or none) of these
+solutions very easily. You could follow a specific library's installation
+guides to get up and running in no time.
 
-Alternatively you can install `mcp-server-git` via pip:
+Personally I'm going to be using Hotwire Turbo + Stimulus in most newer
+projects.
 
-```
-pip install mcp-server-git
-```
+## 🍣 Notable opinions and extensions
 
-After installation, you can run it as a script using:
+Flask is a very unopinionated framework but I find in most apps I'm adding the
+same things over and over. Here's a few (but not all) note worthy additions
+and changes.
 
-```
-python -m mcp_server_git
-```
+- **Packages and extensions**:
+    - *[gunicorn](https://gunicorn.org/)* for an app server in both development and production
+    - *[Flask-DB](https://github.com/nickjj/flask-db)* to help manage, migrate and seed your database
+    - *[Flask-Static-Digest](https://github.com/nickjj/flask-static-digest)* to md5 tag and gzip your static files (and add optional CDN support)
+    - *[Flask-Secrets](https://github.com/nickjj/flask-secrets)* to quickly generate secure random tokens you can use for various things
+    - *[Flask-DebugToolbar](https://github.com/flask-debugtoolbar/flask-debugtoolbar)* to show useful information for debugging
+- **Linting, formatting and testing**:
+    - *[ruff](https://github.com/astral-sh/ruff)* is used to lint and format the code base
+    - *[pytest](https://github.com/pytest-dev/pytest)* and *pytest-cov* for writing tests and reporting test coverage
+- **Blueprints**:
+    - Add `page` blueprint to render a `/` page
+    - Add `up` blueprint to provide a few health check pages
+- **Config**:
+    - Log to STDOUT so that Docker can consume and deal with log output
+    - Extract a bunch of configuration settings into environment variables
+    - `config/settings.py` and the `.env` file handles configuration in all environments
+- **Front-end assets**:
+    - `assets/` contains all your CSS, JS, images, fonts, etc. and is managed by esbuild
+    - Custom `502.html` and `maintenance.html` pages
+    - Generate favicons using modern best practices
+- **Flask defaults that are changed**:
+    - `public/` is the static directory where Flask will serve static files from
+    - `static_url_path` is set to `""` to remove the `/static` URL prefix for static files
+    - `ProxyFix` middleware is enabled (check `hello/app.py`)
 
-## Configuration
+Besides the Flask app itself:
 
-### Usage with Claude Desktop
+- [uv](https://github.com/astral-sh/uv) is used for package management instead of `pip3` (builds on my machine are ~10x faster!)
+- Docker support has been added which would be any files having `*docker*` in
+  its name
+- GitHub Actions have been set up
 
-Add this to your `claude_desktop_config.json`:
+## 🚀 Running this app
 
-<details>
-<summary>Using uvx</summary>
+You'll need to have [Docker installed](https://docs.docker.com/get-docker/).
+It's available on Windows, macOS and most distros of Linux. If you're new to
+Docker and want to learn it in detail check out the [additional resources
+links](#learn-more-about-docker-and-flask) near the bottom of this
+README.
 
-```json
-"mcpServers": {
-  "git": {
-    "command": "uvx",
-    "args": ["mcp-server-git", "--repository", "path/to/git/repo"]
-  }
-}
-```
-</details>
+You'll also need to enable Docker Compose v2 support if you're using Docker
+Desktop. On native Linux without Docker Desktop you can [install it as a plugin
+to Docker](https://docs.docker.com/compose/install/linux/). It's been generally
+available for a while now and is stable. This project uses specific [Docker
+Compose v2
+features](https://nickjanetakis.com/blog/optional-depends-on-with-docker-compose-v2-20-2)
+that only work with Docker Compose v2 2.20.2+.
 
-<details>
-<summary>Using docker</summary>
+If you're using Windows, it will be expected that you're following along inside
+of [WSL or WSL
+2](https://nickjanetakis.com/blog/a-linux-dev-environment-on-windows-with-wsl-2-docker-desktop-and-more).
+That's because we're going to be running shell commands. You can always modify
+these commands for PowerShell if you want.
 
-* Note: replace '/Users/username' with the a path that you want to be accessible by this tool
+#### Clone this repo anywhere you want and move into the directory:
 
-```json
-"mcpServers": {
-  "git": {
-    "command": "docker",
-    "args": ["run", "--rm", "-i", "--mount", "type=bind,src=/Users/username,dst=/Users/username", "mcp/git"]
-  }
-}
-```
-</details>
+```sh
+git clone https://github.com/nickjj/docker-flask-example helloflask
+cd helloflask
 
-<details>
-<summary>Using pip installation</summary>
-
-```json
-"mcpServers": {
-  "git": {
-    "command": "python",
-    "args": ["-m", "mcp_server_git", "--repository", "path/to/git/repo"]
-  }
-}
-```
-</details>
-
-### Usage with VS Code
-
-For quick installation, use one of the one-click install buttons below...
-
-[![Install with UV in VS Code](https://img.shields.io/badge/VS_Code-UV-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=git&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22mcp-server-git%22%5D%7D) [![Install with UV in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-UV-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=git&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22mcp-server-git%22%5D%7D&quality=insiders)
-
-[![Install with Docker in VS Code](https://img.shields.io/badge/VS_Code-Docker-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=git&config=%7B%22command%22%3A%22docker%22%2C%22args%22%3A%5B%22run%22%2C%22--rm%22%2C%22-i%22%2C%22--mount%22%2C%22type%3Dbind%2Csrc%3D%24%7BworkspaceFolder%7D%2Cdst%3D%2Fworkspace%22%2C%22mcp%2Fgit%22%5D%7D) [![Install with Docker in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Docker-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=git&config=%7B%22command%22%3A%22docker%22%2C%22args%22%3A%5B%22run%22%2C%22--rm%22%2C%22-i%22%2C%22--mount%22%2C%22type%3Dbind%2Csrc%3D%24%7BworkspaceFolder%7D%2Cdst%3D%2Fworkspace%22%2C%22mcp%2Fgit%22%5D%7D&quality=insiders)
-
-For manual installation, you can configure the MCP server using one of these methods:
-
-**Method 1: User Configuration (Recommended)**
-Add the configuration to your user-level MCP configuration file. Open the Command Palette (`Ctrl + Shift + P`) and run `MCP: Open User Configuration`. This will open your user `mcp.json` file where you can add the server configuration.
-
-**Method 2: Workspace Configuration**
-Alternatively, you can add the configuration to a file called `.vscode/mcp.json` in your workspace. This will allow you to share the configuration with others.
-
-> For more details about MCP configuration in VS Code, see the [official VS Code MCP documentation](https://code.visualstudio.com/docs/copilot/mcp).
-
-```json
-{
-  "servers": {
-    "git": {
-      "command": "uvx",
-      "args": ["mcp-server-git"]
-    }
-  }
-}
+# Optionally checkout a specific tag, such as: git checkout 0.12.0
 ```
 
-For Docker installation:
+#### Copy an example .env file because the real one is git ignored:
 
-```json
-{
-  "mcp": {
-    "servers": {
-      "git": {
-        "command": "docker",
-        "args": [
-          "run",
-          "--rm",
-          "-i",
-          "--mount", "type=bind,src=${workspaceFolder},dst=/workspace",
-          "mcp/git"
-        ]
-      }
-    }
-  }
-}
+```sh
+cp .env.example .env
 ```
 
-### Usage with [Zed](https://github.com/zed-industries/zed)
+#### Build everything:
 
-Add to your Zed settings.json:
+*The first time you run this it's going to take 5-10 minutes depending on your
+internet connection speed and computer's hardware specs. That's because it's
+going to download a few Docker images and build the Python + Yarn dependencies.*
 
-<details>
-<summary>Using uvx</summary>
-
-```json
-"context_servers": [
-  "mcp-server-git": {
-    "command": {
-      "path": "uvx",
-      "args": ["mcp-server-git"]
-    }
-  }
-],
-```
-</details>
-
-<details>
-<summary>Using pip installation</summary>
-
-```json
-"context_servers": {
-  "mcp-server-git": {
-    "command": {
-      "path": "python",
-      "args": ["-m", "mcp_server_git"]
-    }
-  }
-},
-```
-</details>
-
-### Usage with [Zencoder](https://zencoder.ai)
-
-1. Go to the Zencoder menu (...)
-2. From the dropdown menu, select `Agent Tools`
-3. Click on the `Add Custom MCP`
-4. Add the name (i.e. git) and server configuration from below, and make sure to hit the `Install` button
-
-<details>
-<summary>Using uvx</summary>
-
-```json
-{
-    "command": "uvx",
-    "args": ["mcp-server-git", "--repository", "path/to/git/repo"]
-}
-```
-</details>
-
-## Debugging
-
-You can use the MCP inspector to debug the server. For uvx installations:
-
-```
-npx @modelcontextprotocol/inspector uvx mcp-server-git
+```sh
+docker compose up --build
 ```
 
-Or if you've installed the package in a specific directory or are developing on it:
+Now that everything is built and running we can treat it like any other Flask
+app.
 
-```
-cd path/to/servers/src/git
-npx @modelcontextprotocol/inspector uv run mcp-server-git
-```
+Did you receive a `depends_on` "Additional property required is not allowed"
+error? Please update to at least Docker Compose v2.20.2+ or Docker Desktop
+4.22.0+.
 
-Running `tail -n 20 -f ~/Library/Logs/Claude/mcp*.log` will show the logs from the server and may
-help you debug any issues.
+Did you receive an error about a port being in use? Chances are it's because
+something on your machine is already running on port 8000. Check out the docs
+in the `.env` file for the `DOCKER_WEB_PORT_FORWARD` variable to fix this.
 
-## Development
+Did you receive a permission denied error? Chances are you're running native
+Linux and your `uid:gid` aren't `1000:1000` (you can verify this by running
+`id`). Check out the docs in the `.env` file to customize the `UID` and `GID`
+variables to fix this.
 
-If you are doing local development, there are two ways to test your changes:
+#### Setup the initial database:
 
-1. Run the MCP inspector to test your changes. See [Debugging](#debugging) for run instructions.
-
-2. Test using the Claude desktop app. Add the following to your `claude_desktop_config.json`:
-
-### Docker
-
-```json
-{
-  "mcpServers": {
-    "git": {
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "-i",
-        "--mount", "type=bind,src=/Users/username/Desktop,dst=/projects/Desktop",
-        "--mount", "type=bind,src=/path/to/other/allowed/dir,dst=/projects/other/allowed/dir,ro",
-        "--mount", "type=bind,src=/path/to/file.txt,dst=/projects/path/to/file.txt",
-        "mcp/git"
-      ]
-    }
-  }
-}
+```sh
+# You can run this from a 2nd terminal. It will create both a development and
+# test database with the proper user / password credentials.
+./run flask db reset --with-testdb
 ```
 
-### UVX
-```json
-{
-"mcpServers": {
-  "git": {
-    "command": "uv",
-    "args": [
-      "--directory",
-      "/<path to mcp-servers>/mcp-servers/src/git",
-      "run",
-      "mcp-server-git"
-    ]
-    }
-  }
-}
+*We'll go over that `./run` script in a bit!*
+
+#### Check it out in a browser:
+
+Visit <http://localhost:8000> in your favorite browser.
+
+#### Linting the code base:
+
+```sh
+# You should get no output (that means everything is operational).
+./run lint
 ```
 
-## Build
+#### Formatting the code base:
 
-Docker build:
-
-```bash
-cd src/git
-docker build -t mcp/git .
+```sh
+# You should see that everything is unchanged (it's all already formatted).
+./run format
 ```
 
-## License
+*There's also a `./run quality` command to run the above commands together.*
 
-This MCP server is licensed under the MIT License. This means you are free to use, modify, and distribute the software, subject to the terms and conditions of the MIT License. For more details, please see the LICENSE file in the project repository.
+#### Running the test suite:
+
+```sh
+# You should see all passing tests. Warnings are typically ok.
+./run test
+```
+
+#### Stopping everything:
+
+```sh
+# Stop the containers and remove a few Docker related resources associated to this project.
+docker compose down
+```
+
+You can start things up again with `docker compose up` and unlike the first
+time it should only take seconds.
+
+## 🔍 Files of interest
+
+I recommend checking out most files and searching the code base for `TODO:`,
+but please review the `.env` and `run` files before diving into the rest of the
+code and customizing it. Also, you should hold off on changing anything until
+we cover how to customize this example app's name with an automated script
+(coming up next in the docs).
+
+### `.env`
+
+This file is ignored from version control so it will never be committed.
+There's a number of environment variables defined here that control certain
+options and behavior of the application. Everything is documented there.
+
+Feel free to add new variables as needed. This is where you should put all of
+your secrets as well as configuration that might change depending on your
+environment (specific dev boxes, CI, production, etc.).
+
+### `run`
+
+You can run `./run` to get a list of commands and each command has
+documentation in the `run` file itself.
+
+It's a shell script that has a number of functions defined to help you interact
+with this project. It's basically a `Makefile` except with [less
+limitations](https://nickjanetakis.com/blog/replacing-make-with-a-shell-script-for-running-your-projects-tasks).
+For example as a shell script it allows us to pass any arguments to another
+program.
+
+This comes in handy to run various Docker commands because sometimes these
+commands can be a bit long to type. Feel free to add as many convenience
+functions as you want. This file's purpose is to make your experience better!
+
+*If you get tired of typing `./run` you can always create a shell alias with
+`alias run=./run` in your `~/.bash_aliases` or equivalent file. Then you'll be
+able to run `run` instead of `./run`.*
+
+## ✨ Running a script to automate renaming the project
+
+The app is named `hello` right now but chances are your app will be a different
+name. Since the app is already created we'll need to do a find / replace on a
+few variants of the string "hello" and update a few Docker related resources.
+
+And by we I mean I created a zero dependency shell script that does all of the
+heavy lifting for you. All you have to do is run the script below.
+
+#### Run the rename-project script included in this repo:
+
+```sh
+# The script takes 2 arguments.
+#
+# The first one is the lower case version of your app's name, such as myapp or
+# my_app depending on your preference.
+#
+# The second one is used for your app's module name. For example if you used
+# myapp or my_app for the first argument you would want to use MyApp here.
+bin/rename-project myapp MyApp
+```
+
+The [bin/rename-project
+script](https://github.com/nickjj/docker-flask-example/blob/main/bin/rename-project)
+is going to:
+
+- Remove any Docker resources for your current project
+- Perform a number of find / replace actions
+- Optionally initialize a new git repo for you
+
+*Afterwards you can delete this script because its only purpose is to assist in
+helping you change this project's name without depending on any complicated
+project generator tools or 3rd party dependencies.*
+
+If you're not comfy running the script or it doesn't work for whatever reasons
+you can [check it
+out](https://github.com/nickjj/docker-flask-example/blob/main/bin/rename-project)
+and perform the actions manually. It's mostly running a find / replace across
+files and then renaming a few directories and files.
+
+#### Start and setup the project:
+
+This won't take as long as before because Docker can re-use most things. We'll
+also need to setup our database since a new one will be created for us by
+Docker.
+
+```sh
+docker compose up --build
+
+# Then in a 2nd terminal once it's up and ready.
+./run flask db reset --with-testdb
+```
+
+#### Sanity check to make sure the tests still pass:
+
+It's always a good idea to make sure things are in a working state before
+adding custom changes.
+
+```sh
+# You can run this from the same terminal as before.
+./run quality
+./run test
+```
+
+If everything passes now you can optionally `git add -A && git commit -m
+"Initial commit"` and start customizing your app. Alternatively you can wait
+until you develop more of your app before committing anything. It's up to you!
+
+#### Tying up a few loose ends:
+
+You'll probably want to create a fresh `CHANGELOG.md` file for your project. I
+like following the style guide at <https://keepachangelog.com/> but feel free
+to use whichever style you prefer.
+
+Since this project is MIT licensed you should keep my name and email address in
+the `LICENSE` file to adhere to that license's agreement, but you can also add
+your name and email on a new line.
+
+If you happen to base your app off this example app or write about any of the
+code in this project it would be rad if you could credit this repo by linking
+to it. If you want to reference me directly please link to my site at
+<https://nickjanetakis.com>. You don't have to do this, but it would be very
+much appreciated!
+
+## 🛠 Updating dependencies
+
+You can run `./run uv:outdated` or `./run yarn:outdated` to get a list of
+outdated dependencies based on what you currently have installed. Once you've
+figured out what you want to update, go make those updates in your
+`pyproject.toml` and / or `package.json` file.
+
+Or, let's say you've customized your app and it's time to add a new dependency,
+either for Python or Node.
+
+#### In development:
+
+##### Option 1
+
+1. Directly edit `pyproject.toml` or `assets/package.json` to add your package
+2. `./run deps:install` or `./run deps:install --no-build`
+    - The `--no-build` option will only write out a new lock file without re-building your image
+
+##### Option 2
+
+1. Run `./run uv add mypackage --no-sync` or `run yarn add mypackage --no-lockfile` which will update your `pyproject.toml` or `assets/package.json` with the latest version of that package but not install it
+2. The same step as step 2 from option 1
+
+Either option is fine, it's up to you based on what's more convenient at the
+time. You can modify the above workflows for updating an existing package or
+removing one as well.
+
+You can also access `uv` and `yarn` in Docker with `./run uv` and `./run yarn`
+after you've upped the project.
+
+#### In CI:
+
+You'll want to run `docker compose build` since it will use any existing lock
+files if they exist. You can also check out the complete CI test pipeline in
+the [run](https://github.com/nickjj/docker-flask-example/blob/main/run) file
+under the `ci:test` function.
+
+#### In production:
+
+This is usually a non-issue since you'll be pulling down pre-built images from
+a Docker registry but if you decide to build your Docker images directly on
+your server you could run `docker compose build` as part of your deploy
+pipeline which is similar to how it would work in CI.
+
+## 🤝 See a way to improve something?
+
+If you see anything that could be improved please open an issue or start a PR.
+Any help is much appreciated!
+
+## 🌎 Additional resources
+
+Now that you have your app ready to go, it's time to build something cool! If
+you want to learn more about Docker, Flask and deploying a Flask app here's a
+couple of free and paid resources. There's Google too!
+
+### Learn more about Docker and Flask
+
+#### Official documentation
+
+- <https://docs.docker.com/>
+- <https://flask.palletsprojects.com/>
+
+#### Courses
+
+- [https://diveintodocker.com](https://diveintodocker.com?ref=docker-flask-example)
+  is a course I created which goes over the Docker and Docker Compose
+  fundamentals
+- [https://buildasaasappwithflask.com](https://buildasaasappwithflask.com?ref=docker-flask-example)
+  is a course I created where we build a real world SAAS app with Flask
+
+### Deploy to production
+
+I'm creating an in-depth course related to deploying Dockerized web apps. If
+you want to get notified when it launches with a discount and potentially get
+free videos while the course is being developed then [sign up here to get
+notified](https://nickjanetakis.com/courses/deploy-to-production).
+
+## 👀 About the author
+
+- Nick Janetakis | <https://nickjanetakis.com> | [@nickjanetakis](https://twitter.com/nickjanetakis)
+
+I'm a self taught developer and have been freelancing for the last ~20 years.
+You can read about everything I've learned along the way on my site at
+[https://nickjanetakis.com](https://nickjanetakis.com/).
+
+There's hundreds of [blog posts](https://nickjanetakis.com/blog) and a couple
+of [video courses](https://nickjanetakis.com/courses) on web development and
+deployment topics. I also have a [podcast](https://runninginproduction.com)
+where I talk with folks about running web apps in production.
+</file>
+
+<file path="CHANGELOG.md">
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a
+Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## [Unreleased]
+
+### Added
+
+- `setuptools` Python dependency since Docker recently removed this from the official Python image
+- `./run pip3 [...]` to run any Pip command
+- `./run yarn [...]` to run any Yarn command
+- Dummy `SECRET_KEY` value to `flask digest compile` in Dockerfile
+- `FLASK_DEBUG` build argument to the assets build stage
+- `./run lint:shell` for linting shell scripts with ShellCheck
+- `./run format:shell` for formatting shell scripts with shfmt
+
+### Changed
+
+- Get Flask version in `hello/page/views.py` with metadata instead of `__version__`
+- Replace `./run pip3:install` with `./run deps:install [--no-build]` to install any deps
+- Replace `./run yarn:install` with `./run deps:install [--no-build]` to install any deps
+- Allow overriding `$TTY` as an environment variable in the `run` script
+- Use `.hadolint.yaml` to configure Hadolint instead of inline flags
+- Replace Black, flake8 and isort with Ruff
+- Replace `pip3` with `uv` for Python package management (~10x speed boost!)
+- Refactor `Dockerfile` to use multi-stage app builds (~50% / 250MB image size reduction!)
+
+#### Languages and services
+
+- Update `Python` to `3.13.5`
+- Update `Node` to `22.17.1`
+- Update `Postgres` to `17.5`
+- Update `Redis` to `8.0.3`
+
+#### Back-end dependencies
+
+- Update `alembic` to `1.16.4`
+- Update `celery` to `5.5.3`
+- Update `flask-debugtoolbar` to `0.16.0`
+- Update `flask` to `3.1.1`
+- Update `gunicorn` to `23.0.0`
+- Update `jinja2` to `3.1.6`
+- Update `psycopg` to `3.2.9`
+- Update `pytest-cov` to `6.2.1`
+- Update `pytest` to `8.4.1`
+- Update `redis` to `6.2.0`
+- Update `ruff` to `0.12.7`
+- Update `setuptools` to `80.9.0`
+- Update `sqlalchemy` to `2.0.42`
+- Update `werkzeug` to `3.1.3`
+
+#### Front-end dependencies
+
+- Update `@tailwindcss/cli` to `4.1.11`
+- Update `@tailwindcss/postcss` to `4.1.11`
+- Update `esbuild` to `0.25.8`
+- Update `tailwindcss` to `4.1.11`
+
+## [0.12.0] - 2024-08-09
+
+### Added
+
+- `WEB_TIMEOUT` environment variable to configure gunicorn's timeout value (defaults to 120s)
+
+### Changed
+
+- Convert `SECRET_KEY` into a required env var
+- Add `required: false` to `depends_on` in `docker-compose.yml` (requires Docker Compose v2.20.2+)
+- Refactor `create_celery_app` function to be compatible with Python 3.12+
+- Adjust `WEB_CONCURRENCY` to default to N number of CPU cores instead of 1 in development
+- Rename `docker-compose.yml` to `compose.yaml` to stick to the official Docker Compose spec
+
+#### Languages and services
+
+- Update `Python` to `3.12.5`
+- Update `Node` to `20.6.1`
+- Update `Postgres` to `16.3`
+- Update `Redis` to `7.2.5`
+
+#### Back-end dependencies
+
+- Update `Flask-DB` to `0.4.1`
+- Update `Flask-DebugToolbar` to `0.15.1`
+- Update `Flask-SQLAlchemy` to `3.1.1`
+- Update `Flask-Static-Digest` to `0.4.1`
+- Update `Flask` to `3.0.3`
+- Update `Jinja2` to `3.1.4`
+- Update `SQLAlchemy-Utils` to `0.41.2`
+- Update `SQLAlchemy` to `2.0.32`
+- Update `alembic` to `1.13.2`
+- Update `black` to `24.8.0`
+- Update `celery` to `5.4.0`
+- Update `flake8` to `7.1.1`
+- Update `gunicorn` to `22.0.0`
+- Update `isort` to `5.13.2`
+- Update `psycopg` to `3.2.1`
+- Update `pytest-cov` to `5.0.0`
+- Update `pytest` to `8.3.2`
+- Update `redis` to `5.0.8`
+- Update `werkzeug` to `3.0.3`
+
+#### Front-end dependencies
+
+- Update `autoprefixer` to `10.4.20`
+- Update `esbuild` to `0.23.0`
+- Update `postcss-import` to `16.1.0`
+- Update `postcss` to `8.4.41`
+- Update `tailwindcss` to `3.4.8`
+
+## [0.11.0] - 2023-05-13
+
+### Added
+
+- Ability to customize `UID` and `GID` if you're not using `1000:1000` (check the `.env.example` file)
+- Output `docker compose logs` in CI for easier debugging
+- `isort` to auto-sort Python imports and a new `./run format:imports` command
+- `./run quality` to run all lint and format commands in 1 command
+
+### Changed
+
+- Adjust `x-assets` to use a `stop_grace_period` of `0` for faster CTRL+c times in dev
+- Reference `PORT` variable in the `docker-compose.yml` web service instead of hard coding `8000`
+- Adjust Hadolint to exit > 0 if any style warnings are present
+- Rename `esbuild.config.js` to `esbuild.config.mjs` and refactor config for esbuild 0.17+
+- In `hello/up/views.py`, update raw SQL `SELECT 1` health check for SQLAlchemy 2.0
+- Explicitly set `DEBUG` config option based off the `FLASK_DEBUG` env var so the intent is clear
+
+#### Languages and services
+
+- Update `Python` to `3.11.3`
+- Update `Node` to `18.15.0`
+- Update `Postgres` to `15.3`
+- Update `Redis` to `7.0.11`
+
+#### Back-end dependencies
+
+- Replace `psycopg2` with `psycopg` (3.1.9)
+- Update `Flask-SQLAlchemy` to `3.0.3`
+- Update `Flask-Static-Digest` to `0.3.0`
+- Update `Flask` to `2.3.2`
+- Update `SQLAlchemy-Utils` to `0.41.1`
+- Update `SQLAlchemy` to `2.0.13`
+- Update `alembic` to `1.10.4`
+- Update `black` to `23.3.0`
+- Update `flake8` to `6.0.0`
+- Update `isort` to `5.12.0`
+- Update `psycopg2` to `2.9.6`
+- Update `pytest-cov` to `4.0.0`
+- Update `pytest` to `7.3.1`
+- Update `redis` to `4.5.5`
+- Update `werkzeug` to `2.3.4`
+
+#### Front-end dependencies
+
+- Update `autoprefixer` to `10.4.14`
+- Update `esbuild` to `0.17.19`
+- Update `postcss-import` to `15.1.0`
+- Update `postcss` to `8.4.23`
+- Update `tailwindcss` to `3.3.2`
+
+### Removed
+
+- `set -o nounset` from `run` script since it's incompatible with Bash 3.2 (default on macOS)
+
+### Fixed
+
+- Correctly append `_test` database name to database URI when using query strings
+- Ensure Flake8, Black and isort all use 79 as the max line length
+
+## [0.10.0] - 2022-09-08
+
+### Added
+
+- `set -o nounset` to `run` script to exit if there's any undefined variables
+
+### Changed
+
+- Replace `FLASK_ENV` with `FLASK_DEBUG` (`FLASK_ENV` will be deprecated in Flask 2.3)
+- Switch Docker Compose `env_file` to `environment` for `postgres` to avoid needless recreates on `.env` changes
+- Replace override file with Docker Compose profiles for running specific services
+- Update Github Actions to use Ubuntu 22.04
+- Enable BuildKit by default in the `.env.example` file
+
+#### Languages and services
+
+- Update `Python` to `3.10.5`
+- Update `Node` to `16.15.1`
+- Update `PostgreSQL` to `14.5`
+- Update `Redis` to `7.0.4`
+
+#### Back-end dependencies
+
+- Update `Flask` to `2.2.2`
+- Update `SQLAlchemy-Utils` to `0.38.3`
+- Update `SQLAlchemy` to `1.4.40`
+- Update `alembic` to `1.8.1`
+- Update `black` to `22.6.0`
+- Update `celery` to `5.2.7`
+- Update `flake8` to `5.0.4`
+- Update `jinja` to `2.1.2`
+- Update `redis` to `4.3.4`
+- Update `werkzeug` to `2.2.2`
+
+#### Front-end dependencies
+
+- Update `autoprefixer` to `10.4.8`
+- Update `esbuild` to `0.15.2`
+- Update `postcss` to `8.4.16`
+- Update `tailwindcss` to `3.1.8`
+
+### Removed
+
+- Docker Compose `env_file` property for `redis` to avoid needless recreates on `.env` changes
+- Drop support for Docker Compose v1 (mainly to use profiles in an optimal way, it's worth it!)
+
+## [0.9.0] - 2022-05-15
+
+### Added
+
+- `yarn cache clean` after `yarn install` in `Dockerfile` (Hadolint warning)
+- `--no-cache-dir` flag to `pip3 install` command in `bin/pip3-install` (Hadolint warning)
+- [esbuild-copy-static-files](https://github.com/nickjj/esbuild-copy-static-files) plugin to drastically improve how static files are copied (check `assets/esbuild.config.js`)
+
+### Changed
+
+- Update Bash shebang to use `#!/usr/bin/env bash` in `pip3-install` and `docker-entrypoint-web`
+- Refactor `/up/` endpoint into its own view and add `/up/databases` as a second URL
+
+#### Languages and services
+
+- Update `Python` to `3.10.4`
+- Update `Node` to `16.14.2`
+- Update `PostgreSQL` to `14.2`
+- Update `Redis` to `7.0.0`
+
+#### Back-end dependencies
+
+- Update `Flask` to `2.1.2`
+- Update `SQLAlchemy-Utils` to `0.38.2`
+- Update `SQLAlchemy` to `1.4.36`
+- Update `alembic` to `1.7.7`
+- Update `black` to `22.3.0`
+- Update `celery` to `5.2.6`
+- Update `flask-debugtoolbar` to `0.13.1`
+- Update `jinja2` to `3.1.1`
+- Update `psycopg2` to `2.9.3`
+- Update `pytest` to `7.1.2`
+- Update `redis` to `4.3.1`
+- Update `werkzeug` to `2.1.1`
+
+#### Front-end dependencies
+
+- Update `autoprefixer` to `10.4.7`
+- Update `esbuild` to `0.14.39`
+- Update `postcss-import` to `14.1.0`
+- Update `postcss` to `8.4.13`
+- Update `tailwindcss` to `3.0.24`
+
+### Fixed
+
+- `COPY --chown=node:node ../ ../` has been fixed to be `COPY --chown=node:node . ..`
+
+## [0.8.0] - 2021-12-25
+
+### Added
+
+- Lint Dockerfile with <https://github.com/hadolint/hadolint>
+- `/node_modules/.bin` to `$PATH` to easier access Yarn installed binaries
+- `yarn:build:js` and `yarn:build:css` run script commands
+
+### Changed
+
+- Update `assets/tailwind.config.js` based on the new TailwindCSS v3 defaults
+- Replace all traces of Webpack with esbuild
+- Move JS and CSS from `assets/app` to `assets/js` and `assets/css`
+- Rename `webpack` Docker build stage to `assets`
+- Copy all files into the `assets` build stage to simplify things
+- Replace `cp -a` with `cp -r` in Docker entrypoint to make it easier to delete older assets
+- Rename `run hadolint` to `run lint:dockerfile`
+- Rename `run flake8` to `run lint`
+- Rename `run black` to `run format`
+- Rename `run pytest` to `run test`
+- Rename `run pytest-cov` to `run test:coverage`
+- Rename `run bash` to `run shell`
+
+#### Languages and services
+
+- Update `Node` to `16.13.1`
+- Update `PostgreSQL` to `14.1` and switch to Debian Bullseye Slim
+- Update `Redis` to switch to Debian Bullseye Slim
+
+#### Back-end packages
+
+- Update `SQLAlchemy-Utils` to `0.38.1`
+- Update `SQLAlchemy` to `1.4.29`
+- Update `alembic` to `1.7.5`
+- Update `celery` to `5.2.1`
+- Update `flake8` to `4.0.1`
+- Update `psycopg2` to `2.9.2`
+- Update `py` to `1.11.0`
+- Update `redis` to `4.0.2`
+- Update `werkzeug` to `2.0.2`
+
+#### Front-end packages
+
+- Update `autoprefixer` to `10.4.0`
+- Update `postcss` to `8.4.5`
+- Update `tailwindcss` to `3.0.7`
+
+### Removed
+
+- Deleting old assets in the Docker entrypoint (it's best to handle this out of band in a cron job, etc.)
+
+## [0.7.0] - 2021-10-10
+
+### Changed
+
+- Use f string for `db` variable in `config/settings.py`
+
+#### Languages and services
+
+- Update `Python` to `3.10.0` and switch to Debian Bullseye Slim
+- Update `PostgreSQL` to `14.0`
+- Update `Redis` to `6.2.6`
+
+#### Back-end packages
+
+- Update `Flask-DB` to `0.3.2`
+- Update `Flask` to `2.0.2`
+- Update `SQLAlchemy-Utils` to `0.37.8`
+- Update `SQLAlchemy` to `1.4.25`
+- Update `alembic` to `1.7.4`
+- Update `celery` to `5.1.2`
+- Update `psycopg2` to `2.9.1`
+- Update `pytest-cov` to `3.0.0`
+- Update `pytest` to `6.2.5`
+
+#### Front-end packages
+
+- Update `@babel/core` to `7.15.8`
+- Update `@babel/preset-env` to `7.15.8`
+- Update `@babel/register` to `7.15.3`
+- Update `autoprefixer` to `10.3.7`
+- Update `copy-webpack-plugin` to `9.0.1`
+- Update `css-loader` to `6.4.0`
+- Update `css-minimizer-webpack-plugin` to `3.1.1`
+- Update `mini-css-extract-plugin` to `2.4.2`
+- Update `postcss-loader` to `6.1.1`
+- Update `postcss` to `8.3.9`
+- Update `tailwindcss` to `2.2.16`
+- Update `webpack-cli` to `4.9.0`
+- Update `webpack` to `5.58.1`
+
+## [0.6.0] - 2021-05-27
+
+### Added
+
+- `hello/initializers.py` now exists to define frequently used imports, variables, etc.
+
+### Changed
+
+- Use the Docker Compose spec in `docker-compose.yml` (removes `version:` property)
+- Update Tailwind from `2.1.0` to `2.1.2`
+- Update all Webpack related dependencies to their latest versions
+- Update Flask from `1.1.2` to `2.0.1`
+- Update Celery from `5.0.5` to `5.1.0`
+- Update Alembic from `1.5.8` to `1.6.4`
+- Update SQLAlchemy from `1.4.11` to `1.4.15`
+- Update SQLAlchemy-Utils from `0.37.0` to `0.37.4`
+- Update Redis from `6.0.10` to `6.2.3`
+- Update pytest from `6.2.2` to `6.2.4`
+- Update pytest-cov from `2.11.1` to `2.12.0`
+- Use the new Flask 2.0 `.get` decorator
+
+## [0.5.0] - 2021-04-24
+
+### Added
+
+- `bin/rename-project` script to assist with renaming the project
+- Use Black to format Python code
+
+### Changed
+
+- Switch `OptimizeCSSAssetsPlugin` with `CssMinimizerPlugin` for Webpack 5
+- Replace deprecated Webpack 5 `file-loader` with `asset/resource`
+- Avoid using multi-line imports with commas or parenthesis
+- Update SQLAlchemy from `1.3.23` to `1.4.11`
+- Update SQLAlchemy-Utils from `0.36.8` to `0.37.0`
+- Update Flask-SQLAlchemy from `2.4.4` to `2.5.1`
+- Update gunicorn from `20.0.4` to `20.1.0`
+- Update Alembic from `1.5.4` to `1.5.8`
+- Update flake8 from `3.8.4` to `3.9.1`
+- Update TailwindCSS to `2.1.0` and enable the JIT compiler
+- Replace `APP_NAME` in `run` script with `POSTGRES_USER` for connecting to psql
+
+### Removed
+
+- `hello/blueprints/` namespace has been removed
+- Unused `webpack` import in Webpack config
+- Remove Webpack's cache since the JIT compiler is pretty speedy as is
+
+### Fixed
+
+- Code styling issues in the Webpack config (single quotes, semi-colons, etc.)
+- Set an empty ENTRYPOINT for the worker to avoid race conditions when copying static files
+- Fix `run` script error for unbound variable in older versions of Bash on macOS
+
+## [0.4.0] - 2021-03-02
+
+### Added
+
+- `PORT` env variable to be compatible with more hosting providers
+- `CELERY_LOG_LEVEL` env variable to configure Celery's log level (defaults to `info`)
+- `run cmd` to run any command you want in the web container, ie. `run cmd python3 --version`
+
+### Changed
+
+- Rename `DOCKER_WEB_PORT` to `DOCKER_WEB_PORT_FORWARD`
+- Refactor `run` script so all web container commands use the new `cmd` function
+- Replace `##` comments with `#` in the `run` script
+
+### Removed
+
+- Ability to customize gunicorn bind host, it's hard coded to `0.0.0.0` now
+- `curl` and `libpq-dev` apt dependencies from the webpack image (they're not needed)
+- Remove unnecessary `mkdir` for the pip cache dir and chown'ing `/home/python`
+
+### Fixed
+
+- Define `PYTHONPATH="."` env var in the Dockerfile so that `flask db migrate` works
+- Update Flask-DB to `0.3.1` which makes sure `alembic.ini.new` gets properly initialized
+- Commit `public/.keep` and make sure the `.keep` file is never removed
+
+## [0.3.0] - 2021-02-20
+
+### Added
+
+- `run pip3:outdated` task to show outdated Python dependencies
+- `run yarn:outdated` task to show outdated Node dependencies
+
+### Changed
+
+- Update PostgreSQL from `13.1` to `13.2`
+- Update Redis from `6.0.9` to `6.0.10`
+- Update Python from `3.9.1` to `3.9.2`
+- Update Node from `14.15.1` to `14.5.5`
+- Update all Python and Node packages to their latest stable releases
+- Import `Redis` more efficiently in `hello/extensions.py`
+- Disable Flask tip about `python-dotenv` when running any `flask` CLI command
+- Refactor `run` script to remove a lot of duplication by introducing helper functions
+
+### Removed
+
+- `terser-webpack-plugin` from `package.json` since it comes with Webpack 5 by default
+
+## [0.2.0] - 2020-12-27
+
+### Changed
+
+- Use `REDIS_URL` to configure connections for Redis directly and Celery
+- Add Redis `PING` check to the `/up` health check endpoint
+
+### Removed
+
+- Unnecessary `CELERY_TASK_LIST` comment in `hello/app.py`, this was a left over copy / paste mishap
+
+## [0.1.0] - 2020-12-24
+
+### Added
+
+- Everything!
+
+[Unreleased]: https://github.com/nickjj/docker-flask-example/compare/0.12.0...HEAD
+[0.12.0]: https://github.com/nickjj/docker-flask-example/compare/0.11.0...0.12.0
+[0.11.0]: https://github.com/nickjj/docker-flask-example/compare/0.10.0...0.11.0
+[0.10.0]: https://github.com/nickjj/docker-flask-example/compare/0.9.0...0.10.0
+[0.9.0]: https://github.com/nickjj/docker-flask-example/compare/0.8.0...0.9.0
+[0.8.0]: https://github.com/nickjj/docker-flask-example/compare/0.7.0...0.8.0
+[0.7.0]: https://github.com/nickjj/docker-flask-example/compare/0.6.0...0.7.0
+[0.6.0]: https://github.com/nickjj/docker-flask-example/compare/0.5.0...0.6.0
+[0.5.0]: https://github.com/nickjj/docker-flask-example/compare/0.4.0...0.5.0
+[0.4.0]: https://github.com/nickjj/docker-flask-example/compare/0.3.0...0.4.0
+[0.3.0]: https://github.com/nickjj/docker-flask-example/compare/0.2.0...0.3.0
+[0.2.0]: https://github.com/nickjj/docker-flask-example/compare/0.1.0...0.2.0
+[0.1.0]: https://github.com/nickjj/docker-flask-example/releases/tag/0.1.0
 </file>
 
 </files>

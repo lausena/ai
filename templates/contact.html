@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Contact - Get in Touch | EvalPoint{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+    <div class="section-container">
+        <h1 class="page-title">Get in Touch</h1>
+        <p class="page-subtitle">Ready to start a conversation about building AI that lasts?</p>
+    </div>
+</section>
+
+<section class="contact-content">
+    <div class="section-container">
+        <div class="contact-grid">
+            <div class="contact-info">
+                <h2 class="section-title">Let's Connect</h2>
+                <p class="contact-description">
+                    Whether you have questions about AI strategy, want to discuss a potential project, 
+                    or are curious about how I can help your team, I'd love to hear from you.
+                </p>
+                
+                <div class="contact-methods">
+                    <div class="contact-method">
+                        <div class="method-icon">✉️</div>
+                        <div class="method-content">
+                            <h3 class="method-title">Email</h3>
+                            <p class="method-description">For project inquiries and general questions</p>
+                            <a href="mailto:gabriel@evalpoint.ai" class="method-link">gabriel@evalpoint.ai</a>
+                        </div>
+                    </div>
+                    
+                    <div class="contact-method">
+                        <div class="method-icon">📺</div>
+                        <div class="method-content">
+                            <h3 class="method-title">YouTube</h3>
+                            <p class="method-description">AI insights, tutorials, and strategic thinking</p>
+                            <a href="https://youtube.com/@gabrielsena" target="_blank" rel="noopener noreferrer" class="method-link">
+                                @gabrielsena
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="contact-method">
+                        <div class="method-icon">💼</div>
+                        <div class="method-content">
+                            <h3 class="method-title">LinkedIn</h3>
+                            <p class="method-description">Professional updates and industry discussions</p>
+                            <a href="https://linkedin.com/in/gabrielsena" target="_blank" rel="noopener noreferrer" class="method-link">
+                                /in/gabrielsena
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="contact-cta">
+                <div class="cta-card">
+                    <h3 class="card-title">Prefer to Talk Directly?</h3>
+                    <p class="card-description">
+                        Skip the back-and-forth emails and book a strategic consultation call. 
+                        We'll discuss your specific needs and how I can help.
+                    </p>
+                    <a href="{{ url_for('strategy_call') }}" class="cta-button">Book a Strategy Call</a>
+                </div>
+                
+                <div class="response-time">
+                    <h4 class="response-title">Response Time</h4>
+                    <p class="response-text">
+                        I typically respond to emails within 24 hours during business days. 
+                        For urgent matters, please mention "URGENT" in your subject line.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="topics-section">
+    <div class="section-container">
+        <h2 class="section-title">What Can We Discuss?</h2>
+        <div class="topics-grid">
+            <div class="topic-card">
+                <div class="topic-icon">🎯</div>
+                <h3 class="topic-title">AI Strategy</h3>
+                <p class="topic-description">Planning your AI adoption journey and avoiding common pitfalls</p>
+            </div>
+            
+            <div class="topic-card">
+                <div class="topic-icon">🛠️</div>
+                <h3 class="topic-title">Tool Integration</h3>
+                <p class="topic-description">Claude Code, MCP, and other AI development tools</p>
+            </div>
+            
+            <div class="topic-card">
+                <div class="topic-icon">🏗️</div>
+                <h3 class="topic-title">System Architecture</h3>
+                <p class="topic-description">Building scalable, maintainable AI-powered systems</p>
+            </div>
+            
+            <div class="topic-card">
+                <div class="topic-icon">👥</div>
+                <h3 class="topic-title">Team Enablement</h3>
+                <p class="topic-description">Training and processes for internal AI adoption</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="section-container">
+        <h2 class="cta-title">Ready to Start the Conversation?</h2>
+        <p class="cta-description">Whether it's a quick question or a major project, I'm here to help.</p>
+        <div class="cta-buttons">
+            <a href="mailto:gabriel@evalpoint.ai" class="cta-button">Send an Email</a>
+            <a href="{{ url_for('strategy_call') }}" class="cta-button secondary">Book a Call</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

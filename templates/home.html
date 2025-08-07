@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}EvalPoint - Build AI That Lasts{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-container">
+        <div class="hero-content">
+            <h1 class="hero-title">Build AI That Lasts</h1>
+            <p class="hero-subtitle">Strategy, Integration & Principles for What's Next</p>
+            <p class="hero-description">
+                I help teams make sense of AI by focusing on what lasts—not just what's trending.
+                Whether it's integrating tools like Claude Code or designing MCP (Model Context Protocol) projects,
+                the goal is always the same: build the right habits, architectures, and ways of thinking so teams
+                are ready for whatever comes next.
+            </p>
+            <p class="hero-tagline">It's not about chasing models—it's about staying ready for change.</p>
+            <a href="{{ url_for('strategy_call') }}" class="cta-button">👉 Book a Strategy Call</a>
+        </div>
+    </div>
+</section>
+
+<section class="value-proposition">
+    <div class="section-container">
+        <h2 class="section-title">Why EvalPoint?</h2>
+        <div class="value-grid">
+            <div class="value-card">
+                <div class="value-icon">🎯</div>
+                <h3>Strategic Focus</h3>
+                <p>I help you make AI work <em>with</em> your team—not just around it. Focus on foundations that adapt as technology evolves.</p>
+            </div>
+            <div class="value-card">
+                <div class="value-icon">🏗️</div>
+                <h3>Adaptive Systems</h3>
+                <p>Build modular, principled architectures using tools like Claude Code and MCP that grow with your needs.</p>
+            </div>
+            <div class="value-card">
+                <div class="value-icon">📈</div>
+                <h3>Long-term Readiness</h3>
+                <p>Whether you're just starting or evolving your stack, I ensure your team is prepared for what's next.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="section-container">
+        <h2 class="cta-title">Ready to Build AI That Lasts?</h2>
+        <p class="cta-description">Let's navigate the AI landscape together with strong foundations and adaptive thinking.</p>
+        <a href="{{ url_for('strategy_call') }}" class="cta-button secondary">Schedule Your Strategy Call</a>
+    </div>
+</section>
+{% endblock %}

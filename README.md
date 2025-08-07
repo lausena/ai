@@ -1,6 +1,14 @@
-# AI Project
+# EvalPoint - Build AI That Lasts
 
-A simple Flask web application.
+A professional Flask web application for EvalPoint, showcasing AI strategy and integration services with a futuristic design.
+
+## Features
+
+- **Responsive Design**: Mobile-first approach with futuristic styling
+- **Modern UI**: Uses graphite gray, steel blue, brushed silver, electric cyan, and neon lime color palette
+- **Professional Pages**: Home, About, Services, Strategy Call booking, and Contact pages
+- **Testing Suite**: Comprehensive pytest test coverage
+- **Production Ready**: Configured for deployment with Gunicorn
 
 ## Installation
 
@@ -22,62 +30,126 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 uv sync
 ```
 
-## Running the Project
+## Development
 
-### Development Server
-
-```bash
-uv run python -m src.app
-```
-
-The application will start on `http://localhost:8080`
-
-### Available Endpoints
-
-- `/` - AI Consulting homepage
-- `/about` - About the consultant
-- `/services` - AI integration services
-- `/contact` - Contact and booking information
-- `/health` - Health check endpoint
-
-## Deployment
-
-### Production Server
-
-For production deployment, use Gunicorn as the WSGI server:
+### Run Development Server
 
 ```bash
-# Install dependencies including Gunicorn
-uv sync
+# Basic development server (runs on port 8080)
+uv run python app.py
 
-# Run with Gunicorn
-uv run gunicorn --bind 0.0.0.0:8080 wsgi:app
+# With custom port
+uv run python app.py --port 3000
+
+# With debug mode
+uv run python app.py --debug
 ```
+
+### Run Tests
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run tests with verbose output
+uv run pytest -v
+
+# Run specific test file
+uv run pytest tests/test_app.py
+```
+
+### Project Structure
+
+```
+├── app.py                 # Main Flask application
+├── wsgi.py               # WSGI entry point for production
+├── gunicorn_config.py    # Gunicorn configuration
+├── pyproject.toml        # Project dependencies and config
+├── templates/            # Jinja2 templates
+│   ├── base.html        # Base template
+│   ├── home.html        # Homepage
+│   ├── about.html       # About page
+│   ├── services.html    # Services page
+│   ├── strategy_call.html # Strategy call booking
+│   └── contact.html     # Contact page
+├── static/              # Static assets
+│   ├── css/
+│   │   └── style.css    # Main stylesheet
+│   └── js/
+│       └── main.js      # JavaScript functionality
+└── tests/               # Test suite
+    └── test_app.py      # Application tests
+```
+
+## Production Deployment
+
+### Local Production Server
+
+```bash
+# Using Gunicorn with configuration file
+uv run gunicorn --config gunicorn_config.py wsgi:app
+
+# Manual Gunicorn configuration
+uv run gunicorn --bind 0.0.0.0:8080 --workers 2 wsgi:app
+```
+
+### Digital Ocean App Platform
+
+1. Push your code to GitHub
+2. Connect your GitHub repository to Digital Ocean App Platform
+3. Configure the build command:
+   ```bash
+   # No build command needed, uv will handle dependencies
+   ```
+4. Configure the run command:
+   ```bash
+   gunicorn --worker-tmp-dir /dev/shm --config gunicorn_config.py wsgi:app
+   ```
 
 ### Docker Deployment
 
-To deploy using Docker on Ubuntu:
+Create a `Dockerfile`:
 
-```bash
-# Clone the repository
-git clone <your-repo-url>
-cd ai
+```dockerfile
+FROM python:3.13-slim
 
-# Build the Docker image
-docker build -t ai-app .
+WORKDIR /app
 
-# Run the container
-docker run -d -p 8080:8080 --name ai-app ai-app
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Or use docker-compose (create docker-compose.yml first)
-docker-compose up -d
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies
+RUN uv sync --frozen --no-cache
+
+# Copy application code
+COPY . .
+
+# Expose port
+EXPOSE 8080
+
+# Run the application
+CMD ["uv", "run", "gunicorn", "--config", "gunicorn_config.py", "wsgi:app"]
 ```
 
-### Web Server Configuration
+Build and run:
+```bash
+# Build the image
+docker build -t evalpoint .
 
-Configure your web server (nginx, Apache, etc.) to proxy requests to the application running on port 8080.
+# Run the container
+docker run -d -p 8080:8080 --name evalpoint-app evalpoint
 
-Example nginx configuration:
+# Or use Docker Compose (recommended)
+docker compose up -d
+```
+
+### Nginx Configuration
+
+Example nginx configuration for reverse proxy:
+
 ```nginx
 server {
     listen 80;
@@ -90,17 +162,53 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
+    location /static {
+        alias /path/to/your/app/static;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
 }
 ```
 
-## Project Structure
+## Available Pages
 
-- `main.py` - Main Flask application
-- `wsgi.py` - WSGI entry point for production deployment
-- `pyproject.toml` - Project configuration and dependencies
-- `uv.lock` - Locked dependency versions
+- **/** - Homepage with EvalPoint branding and value proposition
+- **/about** - Gabriel Sena's background and experience
+- **/services** - AI integration services and methodology  
+- **/strategy-call** - Strategy session booking with pricing
+- **/contact** - Contact information and social media links
 
+## Design Features
 
-## Adding MCP Servers
-#### Fetch
-claude mcp add http-fetch -- uvx mcp-server-fetch
+- **Futuristic Theme**: Professional look with metallic and neon accents
+- **Mobile-First**: Responsive design that works on all devices
+- **Performance**: Optimized CSS with smooth animations and hover effects
+- **Accessibility**: High contrast colors and readable typography
+- **Modern Fonts**: Uses Inter font family from Google Fonts
+
+## Testing
+
+The application includes comprehensive tests covering:
+
+- Page rendering and content
+- Navigation functionality
+- Responsive design elements
+- Error handling
+- Static asset loading
+
+## Environment Variables
+
+No environment variables are required for basic operation. The application uses sensible defaults for development and production.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `uv run pytest`
+5. Submit a pull request
+
+## License
+
+Private project for EvalPoint services.
