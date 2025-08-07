@@ -99,3 +99,8 @@ server {
 - `wsgi.py` - WSGI entry point for production deployment
 - `pyproject.toml` - Project configuration and dependencies
 - `uv.lock` - Locked dependency versions
+
+
+## Adding MCP Servers
+#### Fetch
+claude mcp add http-fetch -- uvx mcp-server-fetch
