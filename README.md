@@ -137,13 +137,17 @@ CMD ["uv", "run", "gunicorn", "--config", "gunicorn_config.py", "wsgi:app"]
 Build and run:
 ```bash
 # Build the image
-docker build -t evalpoint .
+docker build --platform linux/amd64 -t evalpoint .
 
-# Run the container
-docker run -d -p 8080:8080 --name evalpoint-app evalpoint
-
-# Or use Docker Compose (recommended)
+# Or use Docker Compose
 docker compose up -d
+```
+
+Deploy to Docker registry:
+```
+docker tag evalpoint gxlaus/evalpoint:latest 
+
+docker push gxlaus/evalpoint:latest 
 ```
 
 ### Nginx Configuration
